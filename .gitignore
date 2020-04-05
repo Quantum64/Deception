@@ -2,6 +2,8 @@
 ## Custom
 #################
 
+token
+secret
 testing/
 db/
 db/*
