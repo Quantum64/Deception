@@ -1,8 +1,8 @@
-package co.q64.tripleagent.state.states
+package co.q64.deception.state.states
 
-import co.q64.tripleagent.Game
-import co.q64.tripleagent.state.BasicState
-import co.q64.tripleagent.state.GameState
+import co.q64.deception.Game
+import co.q64.deception.state.BasicState
+import co.q64.deception.state.GameState
 import net.dv8tion.jda.api.EmbedBuilder
 
 class IntroState(game: Game) : BasicState(game, 60) {

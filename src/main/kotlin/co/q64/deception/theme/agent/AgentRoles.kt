@@ -1,8 +1,8 @@
-package co.q64.tripleagent.theme.agent
+package co.q64.deception.theme.agent
 
-import co.q64.tripleagent.Game
-import co.q64.tripleagent.theme.NoRole
-import co.q64.tripleagent.theme.Role
+import co.q64.deception.Game
+import co.q64.deception.theme.NoRole
+import co.q64.deception.theme.Role
 
 object RougeAgentRole : Role {
     override val name get() = "Rouge Agent"

@@ -1,4 +1,4 @@
-package co.q64.tripleagent
+package co.q64.deception
 
 import java.io.File
 import java.nio.file.Files

@@ -1,6 +1,6 @@
-package co.q64.tripleagent.state
+package co.q64.deception.state
 
-import co.q64.tripleagent.Game
+import co.q64.deception.Game
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Message

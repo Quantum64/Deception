@@ -1,8 +1,8 @@
-package co.q64.tripleagent.theme.agent
+package co.q64.deception.theme.agent
 
-import co.q64.tripleagent.Game
-import co.q64.tripleagent.Player
-import co.q64.tripleagent.theme.Team
+import co.q64.deception.Game
+import co.q64.deception.Player
+import co.q64.deception.theme.Team
 import net.dv8tion.jda.api.entities.Member
 
 object ServiceTeam : Team {

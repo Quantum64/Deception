@@ -1,6 +1,6 @@
-package co.q64.tripleagent.theme
+package co.q64.deception.theme
 
-import co.q64.tripleagent.Game
+import co.q64.deception.Game
 
 interface Theme {
     val channelPrefix: String get() = "game-"

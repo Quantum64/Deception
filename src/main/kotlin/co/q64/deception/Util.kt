@@ -1,4 +1,4 @@
-package co.q64.tripleagent
+package co.q64.deception
 
 import net.dv8tion.jda.api.entities.Message
 

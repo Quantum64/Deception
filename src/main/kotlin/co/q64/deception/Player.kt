@@ -1,6 +1,6 @@
-package co.q64.tripleagent
+package co.q64.deception
 
-import co.q64.tripleagent.theme.*
+import co.q64.deception.theme.*
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.TextChannel
 

@@ -1,9 +1,9 @@
-package co.q64.tripleagent.theme.agent
+package co.q64.deception.theme.agent
 
-import co.q64.tripleagent.Player
-import co.q64.tripleagent.state.BasicState
-import co.q64.tripleagent.theme.Operation
-import co.q64.tripleagent.theme.Team
+import co.q64.deception.Player
+import co.q64.deception.state.BasicState
+import co.q64.deception.theme.Operation
+import co.q64.deception.theme.Team
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.MessageReaction

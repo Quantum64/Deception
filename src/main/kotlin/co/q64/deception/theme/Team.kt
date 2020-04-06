@@ -1,6 +1,6 @@
-package co.q64.tripleagent.theme
+package co.q64.deception.theme
 
-import co.q64.tripleagent.Player
+import co.q64.deception.Player
 
 interface Team {
     val name: String

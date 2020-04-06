@@ -1,7 +1,7 @@
-package co.q64.tripleagent.state
+package co.q64.deception.state
 
-import co.q64.tripleagent.Game
-import co.q64.tripleagent.state.states.*
+import co.q64.deception.Game
+import co.q64.deception.state.states.*
 
 enum class GameState(val generator: (Game) -> State) {
     WAITING({ WaitingState }), STARTING({ StartingState(it) }), INTRO({ IntroState(it) }),

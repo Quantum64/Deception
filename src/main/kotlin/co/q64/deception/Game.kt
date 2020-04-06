@@ -1,10 +1,10 @@
-package co.q64.tripleagent
+package co.q64.deception
 
-import co.q64.tripleagent.state.GameState
-import co.q64.tripleagent.state.State
-import co.q64.tripleagent.state.WaitingState
-import co.q64.tripleagent.theme.NoOperation
-import co.q64.tripleagent.theme.agent.AgentTheme
+import co.q64.deception.state.GameState
+import co.q64.deception.state.State
+import co.q64.deception.state.WaitingState
+import co.q64.deception.theme.NoOperation
+import co.q64.deception.theme.agent.AgentTheme
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
