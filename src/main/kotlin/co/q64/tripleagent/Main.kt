@@ -1,7 +1,5 @@
 package co.q64.tripleagent
 
-import discord4j.core.DiscordClientBuilder
-import discord4j.core.event.domain.message.MessageCreateEvent
 import java.io.File
 import java.nio.file.Files
 
@@ -19,8 +17,5 @@ fun main() {
             it
         }
     }
-    val builder = DiscordClientBuilder(token)
-    val client = builder.build()
-    GameHandler(client)
-    client.login().block()
+    Bot(token!!)
 }

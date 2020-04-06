@@ -1,49 +1,128 @@
 package co.q64.tripleagent
 
-import discord4j.core.`object`.entity.Channel
-import discord4j.core.`object`.entity.Guild
-import discord4j.core.`object`.entity.Member
-import discord4j.core.`object`.entity.Message
-import reactor.core.publisher.Flux
-import reactor.core.publisher.toFlux
-import java.time.Duration
+import co.q64.tripleagent.state.GameState
+import co.q64.tripleagent.state.State
+import co.q64.tripleagent.state.WaitingState
+import co.q64.tripleagent.theme.NoOperation
+import co.q64.tripleagent.theme.agent.AgentTheme
+import net.dv8tion.jda.api.Permission
+import net.dv8tion.jda.api.entities.Guild
+import net.dv8tion.jda.api.entities.Member
+import net.dv8tion.jda.api.entities.Message
+import net.dv8tion.jda.api.entities.MessageReaction
+
 
 class Game(private val guild: Guild) {
-    var started = false;
+    val players: MutableList<Player> = mutableListOf()
+    val members: List<Member> get() = players.map { it.member }
+    var state: State = WaitingState
+    var theme = AgentTheme
+    var selected: Player? = null
 
-    fun start(message: Message): Flux<*> {
-        if (started) {
-            return reply(message, "Can't start game. Game is already running!")
+    fun start(message: Message) {
+        if (state !is WaitingState) {
+            return message.reply("Cannot start game. Game is already running!")
         }
-        started = true
-        var countdown: Flux<Message> = message.channel
-                .flatMap { it.createMessage("The game is about to start!") }.toFlux()
-        for (value in 5 downTo 1) {
-            countdown = countdown
-                    .delayElements(Duration.ofSeconds(1))
-                    .flatMap { it.channel }.flatMap { it.createMessage("$value...") }
+        for (player in members) {
+            // TODO Check channel name
+            if (player.voiceState == null || player.voiceState?.channel == null) {
+                return message.reply("Cannot start game. All players must first join voice chat.")
+            }
+            if (player.voiceState?.isGuildMuted == true) {
+                player.mute(false).queue()
+            }
         }
-        val result = countdown.flatMap { players() }.flatMap { member ->
-            guild.createTextChannel { spec ->
-                spec.run {
-                    setName(channelPrefix + member.id)
-                }
-            }.flatMap { created -> created.createMessage(member.mention + " This is your channel. You should watch this channel for the entire game.") }
-        }.delayElements(Duration.ofSeconds(5))
-        return result
+        // TODO Check min players
+        deleteChannels()
+        for (player in players) {
+            guild.createTextChannel(theme.channelPrefix + player.member.idLong).complete().let { channel ->
+                val everyone = channel.createPermissionOverride(guild.publicRole)
+                val user = channel.createPermissionOverride(player.member)
+                player.channel = channel
+                everyone.deny(Permission.MESSAGE_READ, Permission.MESSAGE_HISTORY, Permission.MESSAGE_ADD_REACTION).queue()
+                user.grant(Permission.MESSAGE_READ, Permission.MESSAGE_HISTORY).queue()
+            }
+        }
+        for (count in 1..theme.traitorCount(players.size)) {
+            players.shuffled().firstOrNull { it.team == theme.player }?.let {
+                it.team = theme.traitor
+                it.startingTeam = theme.traitor
+            }
+        }
+        val roles = theme.generateRoles()
+        for (count in 1..theme.roleCount(players.size)) {
+            players.shuffle()
+            roles.shuffled().firstOrNull { role -> role !in players.map { it.role } }?.assign(this)
+        }
+        val operations = theme.generateOperations(this)
+        for (player in players) {
+            player.operation = operations.shuffled()
+                    .firstOrNull { operation -> operation !in players.map { it.operation } && operation.canAssign(player) }
+                    ?: NoOperation
+        }
+        players.shuffle()
+        enter(GameState.STARTING)
     }
 
-    fun join(message: Message): Flux<*> {
-        if (started) {
-            return reply(message, "You can't join a game that has already started!")
+    fun end(message: Message) {
+        if (state is WaitingState) {
+            return message.reply("You can not end the game because the game has not started!")
         }
-        return reply(message, "Joined game!").flatMap { agentRole(guild).flatMap { role -> message.authorAsMember.flatMap { author -> author.addRole(role.id) } } }
+        players.clear()
+        state = WaitingState
+        deleteChannels()
+        unmute()
+        return message.reply("Game ended!")
     }
 
-    private fun players(): Flux<Member> =
-            agentRole(guild).toFlux()
-                    .flatMap { role -> guild.members.filterWhen { member -> member.roles.any { role == it } } }
+    fun join(message: Message) {
+        if (state !is WaitingState) {
+            return message.reply("You can not join the game since it has already started!")
+        }
+        if (inGame(message.member)) {
+            return message.reply("You can not join a game that you have already joined!")
+        }
+        players.add(Player(this, message.member!!))
+        return message.reply("Joined game! (${players.size}/${theme.maxPlayers} players)")
+    }
 
-    private fun channel(member: Member): Flux<Channel> =
-            member.guild.toFlux().flatMap { guild -> guild.channels.filter { channel -> channel.name == "$channelPrefix${member.id}" } }
+    fun leave(message: Message) {
+        if (state !is WaitingState) {
+            return message.reply("You can not leave a game that has already started!")
+        }
+        if (!inGame(message.member)) {
+            return message.reply("You cannot leave a game that you have not joined!")
+        }
+        players.removeIf { it.member == message.member }
+        return message.reply("Left game! (${players.size}/${theme.maxPlayers} players)")
+    }
+
+    fun tick() = state.tick()
+    fun handleReaction(member: Member, reaction: MessageReaction) =
+            state.handleReaction(member, reaction)
+
+    fun enter(new: GameState) {
+        state.exit()
+        state = new.generator(this)
+        state.enter()
+    }
+
+    fun mute() = players.map { it.member }.forEach { member ->
+        member.mute(true).queue()
+    }
+
+    fun unmute() = players.map { it.member }.forEach { member ->
+        member.mute(false).queue()
+    }
+
+    fun inGame(member: Member?): Boolean =
+            players.map { it.member }.any { it == member }
+
+    fun deleteChannels() {
+        for (channel in guild.channels) {
+            if (channel.name.startsWith(theme.channelPrefix)) {
+                channel.delete().complete()
+            }
+        }
+    }
 }
