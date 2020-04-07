@@ -1,10 +1,11 @@
 package co.q64.deception
 
+import reactor.kotlin.core.publisher.toMono
 import java.io.File
 import java.nio.file.Files
 
 fun main() {
-    val token = File("token").run {
+    File("token").run {
         if (!exists()) {
             println("File 'token' not found!")
             return
@@ -17,5 +18,8 @@ fun main() {
             it
         }
     }
-    Bot(token!!)
+            ?.toMono() // TODO ?
+            .orEmpty()
+            .flatMap { Bot(it).start() }
+            .block()
 }

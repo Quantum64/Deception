@@ -18,7 +18,7 @@ import reactor.core.publisher.Mono
 
 class Game(private val guild: Guild) {
     val players: MutableList<Player> = mutableListOf()
-    val members: Flux<Member> get() = Flux.fromIterable(players.map { it.member })
+    val members: List<Member> get() = players.map { it.member }
     var state: State = WaitingState
     var theme = AgentTheme
     var selected: Player? = null
@@ -47,7 +47,7 @@ class Game(private val guild: Guild) {
                                     ))
                         }.map { player.channel = it }
                     }
-                }.then(Mono.just(0).doOnEach {
+                }.doOnComplete {
                     for (count in 1..theme.traitorCount(players.size)) {
                         players.shuffled().firstOrNull { it.team == theme.player }?.let {
                             it.team = theme.traitor
@@ -66,7 +66,7 @@ class Game(private val guild: Guild) {
                                 ?: NoOperation
                     }
                     players.shuffle()
-                }.then(enter(GameState.STARTING))))
+                }.then(enter(GameState.STARTING)))
             }
             .switchIfEmpty(message.reply("Cannot start game. Game is already running!").then(Mono.empty()))
             .then()

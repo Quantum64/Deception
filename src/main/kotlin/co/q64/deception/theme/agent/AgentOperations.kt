@@ -1,6 +1,7 @@
 package co.q64.deception.theme.agent
 
 import co.q64.deception.Player
+import co.q64.deception.orEmpty
 import co.q64.deception.state.BasicState
 import co.q64.deception.theme.Operation
 import co.q64.deception.theme.Team
@@ -9,6 +10,8 @@ import discord4j.core.`object`.reaction.ReactionEmoji
 import discord4j.core.spec.EmbedCreateSpec
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.toFlux
+import reactor.kotlin.core.publisher.toMono
 
 // Templates
 interface AgendaOperation : Operation {
@@ -36,7 +39,7 @@ interface SelectOperation : Operation {
                     .then()
 
     override fun handleReaction(player: Player, message: Message, state: BasicState, reaction: ReactionEmoji): Mono<Void> =
-            Mono.just(reaction)
+            reaction.toMono()
                     .filter { it.asUnicodeEmoji().isPresent }
                     .map { it.asUnicodeEmoji().get() }
                     .map { numbers.indexOf(it.raw) }
@@ -48,50 +51,47 @@ interface SelectOperation : Operation {
 
 // Standard Operations
 
-object SpyTransfer : SelectOperation {
+object SpyTransferOperation : SelectOperation {
     override val title get() = "Spy Transfer"
     override fun description(player: Player) = "${player.member.mention} must choose another agent and secretly swap agencies with them. " +
             "They each now work for the agency the other used to work for."
 
     override fun canAssign(player: Player) = player.role != VirusLoyalistRole && player.role != ServiceLoyalistRole
 
-    override fun prompt(player: Player) = "Select an agent to swap agencies with."
+    override fun prompt(player: Player) = "Choose an agent. You will now work for the agency they used to work for."
 
-    override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
-            Mono
-                    .just(true)
-                    .doOnEach {
-                        player.team = player.team.other
-                        selected.team = selected.team.other
-                    }
-                    .flatMap {
-                        player.channel?.createEmbed {
-                            it.setTitle("Agency Swap").setDescription("""
+    override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> = Mono
+            .just(true)
+            .doOnEach {
+                player.team = player.team.other
+                selected.team = selected.team.other
+            }
+            .flatMap {
+                player.channel?.createEmbed {
+                    it.setTitle("Agency Swap").setDescription("""
                             You have swapped agencies with ${selected.member.mention}
-                            You are now with **${player.team.name}**.
                             
                             React with ✅ when you have read this message.
                         """.trimIndent())
-                        } ?: Mono.empty()
-                    }.flatMap { state.addReaction(it) }
+                }.orEmpty()
+            }.flatMap { state.addReaction(it) }
 }
 
-object Confession : SelectOperation { // TODO do we use actual or apparent role for this?
+object ConfessionOperation : SelectOperation { // TODO do we use actual or apparent role for this?
     override val title = "Confession"
     override fun description(player: Player) = "${player.member.mention} must divulge their agency to one other agent."
 
     override fun prompt(player: Player) = "You must divulge their agency to one other agent. Select which agent you would like to tell."
 
     override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
-            (player.channel?.createEmbed {
+            player.channel?.createEmbed {
                 it.setTitle("Transmitting Message").setDescription(selected.member.mention + " will receive your confession shortly.")
-            } ?: Mono.empty())
+            }.orEmpty()
                     .flatMap { state.addReaction(it) }
-                    .zipWith((selected.channel?.createEmbed {
+                    .zipWith(selected.channel?.createEmbed {
                         it.setTitle("Confession").setDescription("${player.member.mention} has divulged that they work for **${player.team.name}**. " +
                                 "Only you have received this information.")
-                    } ?: Mono.empty())
-                            .flatMap { state.addReaction(it) })
+                    }.orEmpty().flatMap { state.addReaction(it) })
                     .then()
 }
 
@@ -101,7 +101,7 @@ object AnonymousTipOperation : Operation {
     override val title get() = "Anonymous Tip"
     override fun description(player: Player) = "${player.member.mention}'s source knows the agency of one other agent and reveals it to them."
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> =
-            Mono.just(player.game.players.shuffled().first { it != player })
+            player.game.players.shuffled().firstOrNull { it != player }?.toMono().orEmpty()
                     .map { target ->
                         { embed: EmbedCreateSpec ->
                             embed.setDescription("""
@@ -119,16 +119,16 @@ object DanishIntelligenceOperation : Operation {
 
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> =
             // TODO Should this use apparent or actual team?
-            Mono.just(listOf(
-                    player.game.players.shuffled().first { it != player && apparentTeam(it) == VirusTeam },
-                    player.game.players.shuffled().first { it != player && apparentTeam(it) == ServiceTeam }
-            ).shuffled())
+            listOf(
+                    player.game.players.shuffled().firstOrNull { it != player && apparentTeam(it) == VirusTeam },
+                    player.game.players.shuffled().firstOrNull { it != player && apparentTeam(it) == ServiceTeam }
+            ).shuffled().toMono()
                     .map { targets ->
                         { embed: EmbedCreateSpec ->
                             embed.setDescription("""
                                 The transmission reveals that one of the following two players is a VIRUS agent, and one is not.
-                                ${targets[0].member.mention}
-                                ${targets[1].member.mention}
+                                ${targets[0]?.member?.mention ?: "Unknown"}
+                                ${targets[1]?.member?.mention ?: "Unknown"}
                             """.trimIndent())
                             Unit
                         }
@@ -143,62 +143,92 @@ object OldPhotographsOperation : Operation {
         val first = player.game.players.shuffled().firstOrNull { it != player && (player.team == ServiceTeam || it.team == ServiceTeam) }
         val second = player.game.players.shuffled().firstOrNull { it != first && it != player && it.startingTeam == first?.startingTeam }
         if (first == null || second == null) {
-            return Mono.just { embed -> embed.setDescription("There are not enough agents to provide you with any useful information.") } //TODO is this possible?
+            return Mono.just { embed -> embed.setDescription("There are not enough agents to provide you with any useful information.") }
         }
         return Mono.just { embed -> embed.setDescription("Evidence reveals that ${first.member.mention} and ${second.member.mention} started on the same team.") }
     }
 }
 
-object DeepUndercover : SelectOperation { // TODO again, actual or apparent team?
+object DeepUndercoverOperation : SelectOperation { // TODO again, actual or apparent team?
     override val title get() = "Deep Undercover"
     override fun description(player: Player) = "${player.member.mention} picks one agent to discover their true agency. " +
             "If they turn out to be a virus agent, the ${player.member.mention} will join their cause."
 
-    override fun prompt(player: Player) = "Select a player to discover their true agency."
+    override fun prompt(player: Player) = "Pick an agent and discover their identity. If they are a VIRUS agent, you will join their cause, otherwise you stay in the same agency."
     override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
-            Mono.just("Intelligence reveals that ${selected.member.mention} is with **${selected.team.name}**." +
+            Mono.just((
                     if (selected.team == VirusTeam) {
-                        if (player.role == ServiceLoyalistRole) {
+                        "You now know that ${selected.member.mention} is a **${VirusTeam.name}** agent." + (if (player.role == ServiceLoyalistRole) {
                             "\n\nYou would have switched to **${selected.team.name}**, but you are a __${player.role.name}__, so your agency has not changed."
                         } else {
-                            "\n\nYou were already with **${player.team.name}**, so your agency has not changed."
+                            "\n\nIf you weren't before, you are now working for **${VirusTeam.name}**."
+                        })
+                    } else "You now know that ${selected.member.mention} is with **${selected.team.name}**.") + "\nReact with ✅ when you have read this message.")
+                    .doOnEach {
+                        if (selected.team == VirusTeam && player.role != ServiceLoyalistRole) {
+                            player.team = VirusTeam
                         }
-                    } else "" + "\nReact with ✅ when you have read this message.")
+                    }
                     .flatMap { text ->
-                        player.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(text) }
-                                ?: Mono.empty()
+                        player.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(text) }.orEmpty()
                     }
                     .flatMap { state.addReaction(it) }
 }
 
-object UnfortunateEncounter : SelectOperation {
+object UnfortunateEncounterOperation : SelectOperation {
     override val title get() = "Unfortunate Encounter"
     override fun description(player: Player) = "${player.member.mention} picks one agent. They will both see whether both or either of them works for VIRUS."
 
     override fun prompt(player: Player) = "Select an agent. You will both see if both of you or either of you works for VIRUS."
 
     override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
-            Mono.just(listOf(player, selected).shuffled().map { it.member.mention })
+            listOf(player, selected).shuffled().map { it.member.mention }.toMono()
                     .map { players ->
                         (if (apparentTeam(player) == VirusTeam && apparentTeam(selected) == VirusTeam)
-                            "New intelligence reveals that both ${players[0]} and ${players[1]} work for VIRUS."
+                            "New intelligence reveals that both ${players[0]} and ${players[1]} work for **VIRUS**."
                         else if (apparentTeam(player) == VirusTeam || apparentTeam(selected) == VirusTeam)
-                            "New intelligence reveals that either ${players[0]} or ${players[1]} work for VIRUS."
+                            "New intelligence reveals that either ${players[0]} or ${players[1]} work for **VIRUS**."
                         else
-                            "New intelligence reveals that neither ${players[0]} nor ${players[1]} work for VIRUS."
+                            "New intelligence reveals that neither ${players[0]} nor ${players[1]} work for **VIRUS**."
                                 ) + "\n\nReact with ✅ when you have read this message."
                     }.flatMap { description ->
-                        (player.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(description) }
-                                ?: Mono.empty())
-                                .and(selected.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(description) }
-                                        ?: Mono.just(false).then())
+                        player.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(description) }?.flatMap { state.addReaction(it) }.orEmpty()
+                                .and(selected.channel?.createEmbed { it.setTitle("Incoming Transmission").setDescription(description) }?.flatMap { state.addReaction(it) }.orEmpty())
                     }
                     .then()
 }
 
 // TODO Incriminating Evidence
 
-// TODO Defector (custom select)
+object DefectorOperation : Operation {
+    override val title get() = "Defector"
+    override fun description(player: Player) = "${player.member.mention} may defect and join the other agency. A VIRUS defector loses if any other VIRUS agent votes for them. A Service defector can't vote."
+    override fun canAssign(player: Player) = player.role != ServiceLoyalistRole && player.role != VirusLoyalistRole
+
+    override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setDescription("You are currently working for **${player.team.name}**. Defecting comes at a cost: " +
+                (if (player.team == ServiceTeam)
+                    "You won't get to vote in the accusation phase." else
+                    "You will lose if any VIRUS agent votes for you.") + "\n\n" +
+                "\uD83D\uDFE2 - Stay the same\n" +
+                "\uD83D\uDFE5 - Defect"
+        )
+    }
+
+    override fun handleMessage(player: Player, message: Message): Mono<Void> =
+            listOf("\uD83D\uDFE2", "\uD83D\uDFE5").toFlux()
+                    .flatMap { message.addReaction(ReactionEmoji.unicode(it)) }
+                    .then()
+
+    override fun handleReaction(player: Player, message: Message, state: BasicState, reaction: ReactionEmoji): Mono<Void> =
+            reaction.toMono()
+                    .doOnEach { state.timer = 1 }
+                    .filter { it.asUnicodeEmoji().isPresent }
+                    .map { it.asUnicodeEmoji().get().raw }
+                    .filter { it == "\uD83D\uDFE5" }
+                    .doOnEach { player.team = player.team.other }
+                    .then()
+}
 
 // Hidden Agendas
 object ScapegoatOperation : AgendaOperation {
@@ -251,8 +281,10 @@ object SleeperAgentOperation : AgendaOperation {
 object SecretTipOperation : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
         val target = player.game.players.shuffled().first { it != player }
-        message.setTitle("Sleeper Agent").setDescription("""
-            You have found that ${target.member.mention} is with **${target.team.name}**
+        message.setTitle("Secret Tip").setDescription("""
+            You get a strange phone call. It reveals that ${target.member.mention} works for **${apparentTeam(target)}**.
+            
+            Tip: Try lying about your info to see how the agent reacts to being accused.
         """.trimIndent())
     }
 }

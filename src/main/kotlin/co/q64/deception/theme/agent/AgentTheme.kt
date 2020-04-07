@@ -74,13 +74,14 @@ object AgentTheme : Theme {
     )
 
     override fun generateOperations(game: Game): List<Operation> = listOf(
-            SpyTransfer,
-            Confession,
+            SpyTransferOperation,
+            ConfessionOperation,
             AnonymousTipOperation,
             DanishIntelligenceOperation,
             OldPhotographsOperation,
-            DeepUndercover,
-            UnfortunateEncounter,
+            DeepUndercoverOperation,
+            UnfortunateEncounterOperation,
+            DefectorOperation,
             ScapegoatOperation,
             GrudgeOperation(game.players.random()),
             InfatuationOperation(game.players.random()),

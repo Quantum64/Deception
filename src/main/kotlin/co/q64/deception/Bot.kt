@@ -17,47 +17,43 @@ private val commands = mapOf<String, (Game, Message) -> Mono<Void>>(
         "end" to { g, m -> g.end(m) }
 )
 
-class Bot(private val token: String) {
+class Bot(token: String) {
     private val games: MutableMap<Guild, Game> = mutableMapOf()
     private val client: DiscordClient = DiscordClientBuilder.create(token).build()
 
-
-    init {
-        Flux.interval(Duration.ofSeconds(1))
-                .flatMapIterable { games.values }
-                .flatMap {
-                    it.tick()
-                }
-                .subscribe()
-
-        client.withGateway { gateway ->
-            gateway.eventDispatcher.on(MessageCreateEvent::class.java)
-                    .filterWhen { it.guild.hasElement() }
-                    .filter { it.message.content.startsWith(commandPrefix) }
-                    .flatMap { event ->
-                        event.guild.flatMap { guild ->
-                            commands[event.message.content.removePrefix(commandPrefix).toLowerCase()]?.let { action ->
-                                action(game(guild), event.message)
-                            }
-                        }
-                    }
-                    .subscribe()
-            gateway.eventDispatcher.on(ReactionAddEvent::class.java)
-                    .filterWhen { it.guild.hasElement() }
-                    .filter { it.member.isPresent }
-                    .flatMap { event ->
-                        event.guild.flatMap { guild ->
-                            event.message.flatMap { message ->
-                                game(guild).handleReaction(event.member.get(), message, event.emoji)
-                            }
-                        }
-                    }
-                    .subscribe()
-            gateway.onDisconnect()
-        }.block()
-
-
-    }
+    fun start(): Mono<Void> = Mono.`when`(
+            Flux.interval(Duration.ofSeconds(1))
+                    .flatMapIterable { games.values }
+                    .flatMap {
+                        it.tick()
+                    },
+            client.withGateway { gateway ->
+                Mono.`when`(
+                        gateway.eventDispatcher.on(MessageCreateEvent::class.java)
+                                .filterWhen { it.guild.hasElement() }
+                                .filter { it.message.content.startsWith(commandPrefix) }
+                                .flatMap { event ->
+                                    event.guild.flatMap { guild ->
+                                        commands[event.message.content.removePrefix(commandPrefix).toLowerCase()]?.let { action ->
+                                            action(game(guild), event.message)
+                                        }
+                                    }
+                                }
+                                .then(),
+                        gateway.eventDispatcher.on(ReactionAddEvent::class.java)
+                                .filterWhen { it.guild.hasElement() }
+                                .filter { it.member.isPresent }
+                                .flatMap { event ->
+                                    event.guild.flatMap { guild ->
+                                        event.message.flatMap { message ->
+                                            game(guild).handleReaction(event.member.get(), message, event.emoji)
+                                        }
+                                    }
+                                }
+                                .then(),
+                        gateway.onDisconnect()
+                )
+            })
 
     private fun game(guild: Guild): Game =
             games.getOrPut(guild, { Game(guild) })

@@ -9,3 +9,5 @@ fun Message.reply(text: String): Mono<Message> =
         channel.flatMap { channel ->
             authorAsMember.flatMap { author -> channel.createMessage("${author.mention} $text") }
         }
+
+fun <T> Mono<T>?.orEmpty(): Mono<T> = this ?: Mono.empty()
