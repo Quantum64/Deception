@@ -3,29 +3,25 @@ package co.q64.deception.state.states
 import co.q64.deception.Game
 import co.q64.deception.state.BasicState
 import co.q64.deception.state.GameState
-import net.dv8tion.jda.api.EmbedBuilder
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 class AssignmentDiscussState(game: Game) : BasicState(game, 60) {
     override val state get() = GameState.ASSIGNMENT_DISCUSS
 
-    override fun enter() {
-        for (player in game.players) {
-            player.channel?.sendMessage(EmbedBuilder()
-                    .setTitle(game.theme.roleAssignmentDiscussTitle)
-                    .setDescription("""
-                            ${game.theme.roleAssignmentDiscussDescription(game.selected?.member?.asMention ?: "Unknown")}
-                            
-                            React with ✅ when you have completed the discussion.
-                        """.trimIndent())
-                    .build())?.queue { addReaction(it) }
-        }
-    }
+    override fun enter(): Mono<Void> = Flux.fromIterable(game.players)
+            .flatMap { player ->
+                game.theme.roleAssignmentDiscuss(game.selected?.member ?: player.member).flatMap { embed ->
+                    player.channel?.createEmbed { embed(it) }
+                }
+            }
+            .flatMap { addReaction(it) }
+            .then()
 
-    override fun timeout() {
+    override fun timeout(): Mono<Void> {
         if (game.players.any { !it.receivedAssignment }) {
-            game.enter(GameState.ASSIGNMENT_START)
-            return
+            return game.enter(GameState.ASSIGNMENT_START)
         }
-        game.enter(GameState.OPERATION_INTRO)
+        return game.enter(GameState.OPERATION_INTRO)
     }
 }

@@ -1,18 +1,19 @@
 package co.q64.deception.state
 
 import co.q64.deception.Game
-import net.dv8tion.jda.api.EmbedBuilder
-import net.dv8tion.jda.api.entities.Member
-import net.dv8tion.jda.api.entities.Message
-import net.dv8tion.jda.api.entities.MessageReaction
+import discord4j.core.`object`.entity.Member
+import discord4j.core.`object`.entity.Message
+import discord4j.core.`object`.reaction.ReactionEmoji
 import org.atteo.evo.inflector.English
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 interface State {
     val state: GameState
-    fun enter() = Unit
-    fun exit() = Unit
-    fun tick() = Unit
-    fun handleReaction(member: Member, reaction: MessageReaction) = Unit
+    fun enter(): Mono<Void> = Mono.empty()
+    fun exit(): Mono<Void> = Mono.empty()
+    fun tick(): Mono<Void> = Mono.empty()
+    fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> = Mono.empty()
 }
 
 abstract class BasicState(val game: Game, var timer: Int = -1) : State {
@@ -20,60 +21,65 @@ abstract class BasicState(val game: Game, var timer: Int = -1) : State {
     var ready: MutableSet<Member> = mutableSetOf()
     var required = 0;
 
-    abstract fun timeout()
-    override fun enter() = Unit
-    override fun exit() = messages.forEach { it.delete().queue() }
+    abstract fun timeout(): Mono<Void>
+    override fun enter(): Mono<Void> = Mono.just(true).then()
+    override fun exit(): Mono<Void> = Flux.fromIterable(messages).flatMap { it.delete() }.then()
 
-    override fun tick() {
+    override fun tick(): Mono<Void> {
         timer--
         if (ready.size >= neededToContinue) {
             timer = 0
         }
         if (timer > 0) {
-            if (timer % 4 == 0) {
-                messages.forEach { updateMessage(it) }
+            if (timer % 2 == 0) {
+                return Flux.fromIterable(messages).flatMap { updateMessage(it) }.then()
             }
-            return
+            return Mono.empty()
         }
         if (timer == 0) {
-            timeout()
+            return timeout()
         }
+        return Mono.empty()
     }
 
-    override fun handleReaction(member: Member, reaction: MessageReaction) {
-        if (reaction.reactionEmote.isEmoji && reaction.reactionEmote.emoji == "✅" && member in game.members) {
+    override fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> {
+        if (reaction.asUnicodeEmoji().isPresent && reaction.asUnicodeEmoji().get().raw == "✅" && member in game.players.map { it.member }) {
             ready.add(member)
         }
+        return Mono.empty()
     }
 
-    fun add(message: Message) {
-        messages.add(message)
-        updateMessage(message)
-    }
+    fun add(message: Message): Mono<Void> =
+            updateMessage(message).doOnEach {
+                messages.add(message)
+            }.then()
 
-    fun addReaction(message: Message) {
-        message.addReaction("✅").queue()
-        required++
-        add(message)
-    }
+    fun addReaction(message: Message): Mono<Void> =
+            message.addReaction(ReactionEmoji.unicode("✅")).doFirst {
+                required++
+            }.and(add(message))
 
-    private fun updateMessage(message: Message) {
-        message.embeds.getOrNull(0)?.let { embed ->
-            message.editMessage(EmbedBuilder(embed)
-                    .setFooter("The game will continue in $timer ${English.plural("second", timer)}. " +
-                            "${ready.size}/$neededToContinue players ready.")
-                    .build()).queue()
-        }
-    }
+    private fun updateMessage(message: Message): Mono<Void> =
+            message.embeds.getOrNull(0)?.let { embed ->
+                message.edit { message ->
+                    message.setEmbed { new ->
+                        embed.title.ifPresent { new.setTitle(it) }
+                        embed.description.ifPresent { new.setDescription(it) }
+                        embed.color.ifPresent { new.setColor(it) }
+                        new.setFooter("The game will continue in $timer ${English.plural("second", timer)}. " +
+                                "${ready.size}/$neededToContinue players ready.", null)
+                    }
+                }.then()
+            } ?: Mono.just(true).then()
 
     private val neededToContinue get() = if (required > 0) required else game.players.size
 }
 
 class NoOpState(private val mock: GameState) : State {
     override val state get() = mock
-    override fun enter() = Unit
-    override fun exit() = Unit
-    override fun tick() = Unit
+    override fun enter() = Mono.just(true).then()
+    override fun exit() = Mono.just(true).then()
+    override fun tick() = Mono.just(true).then()
 }
 
 object WaitingState : State {

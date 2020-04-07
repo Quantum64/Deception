@@ -3,24 +3,23 @@ package co.q64.deception.state.states
 import co.q64.deception.Game
 import co.q64.deception.state.BasicState
 import co.q64.deception.state.GameState
-import net.dv8tion.jda.api.EmbedBuilder
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 
 class AssignmentStartState(game: Game) : BasicState(game, 15) {
     override val state get() = GameState.ASSIGNMENT_START
 
-    override fun enter() {
+    override fun enter(): Mono<Void> {
         game.selected = game.players.first { !it.receivedAssignment }
         game.selected?.receivedAssignment = true
-        for (player in game.players) {
-            player.channel?.sendMessage(EmbedBuilder()
-                    .setTitle(game.theme.roleAssignmentStartTitle)
-                    .setDescription("""
-                            ${game.theme.roleAssignmentStartDescription(game.selected?.member?.asMention ?: "Unknown")}
-                            
-                            React with ✅ when you have read this message.
-                        """.trimIndent())
-                    .build())?.queue { addReaction(it) }
-        }
+        return Flux.fromIterable(game.players)
+                .flatMap { player ->
+                    game.theme.roleAssignmentStart(game.selected?.member ?: player.member).flatMap { embed ->
+                        player.channel?.createEmbed { embed(it) }
+                    }
+                }
+                .flatMap { addReaction(it) }
+                .then()
     }
 
     override fun timeout() = game.enter(GameState.ASSIGNMENT_MESSAGE)

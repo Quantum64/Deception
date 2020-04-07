@@ -1,8 +1,8 @@
 package co.q64.deception
 
 import co.q64.deception.theme.*
-import net.dv8tion.jda.api.entities.Member
-import net.dv8tion.jda.api.entities.TextChannel
+import discord4j.core.`object`.entity.Member
+import discord4j.core.`object`.entity.channel.TextChannel
 
 class Player(val game: Game, val member: Member) {
     var startingTeam: Team = game.theme.player

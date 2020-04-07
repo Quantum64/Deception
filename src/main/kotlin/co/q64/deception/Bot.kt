@@ -1,53 +1,64 @@
 package co.q64.deception
 
-import net.dv8tion.jda.api.JDA
-import net.dv8tion.jda.api.JDABuilder
-import net.dv8tion.jda.api.entities.Guild
-import net.dv8tion.jda.api.entities.Message
-import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent
-import net.dv8tion.jda.api.events.message.guild.react.GuildMessageReactionAddEvent
-import net.dv8tion.jda.api.hooks.ListenerAdapter
-import net.dv8tion.jda.api.requests.GatewayIntent
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import discord4j.core.DiscordClient
+import discord4j.core.DiscordClientBuilder
+import discord4j.core.`object`.entity.Guild
+import discord4j.core.`object`.entity.Message
+import discord4j.core.event.domain.message.MessageCreateEvent
+import discord4j.core.event.domain.message.ReactionAddEvent
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
+import java.time.Duration
 
-private val commands = mapOf<String, (Game, Message) -> Unit>(
+private val commands = mapOf<String, (Game, Message) -> Mono<Void>>(
         "join" to { g, m -> g.join(m) },
         "leave" to { g, m -> g.leave(m) },
         "start" to { g, m -> g.start(m) },
         "end" to { g, m -> g.end(m) }
 )
 
-class Bot(private val token: String) : ListenerAdapter() {
-    private val scheduler = Executors.newSingleThreadScheduledExecutor()
+class Bot(private val token: String) {
     private val games: MutableMap<Guild, Game> = mutableMapOf()
-    private val client: JDA = JDABuilder.create(token,
-            GatewayIntent.GUILD_PRESENCES,
-            GatewayIntent.GUILD_VOICE_STATES,
-            GatewayIntent.GUILD_EMOJIS,
-            GatewayIntent.GUILD_MEMBERS,
-            GatewayIntent.GUILD_MESSAGES,
-            GatewayIntent.GUILD_MESSAGE_REACTIONS).build()
+    private val client: DiscordClient = DiscordClientBuilder.create(token).build()
+
 
     init {
-        client.addEventListener(this)
-        scheduler.scheduleAtFixedRate({
-            games.values.forEach { kotlin.runCatching { it.tick() }.onFailure { it.printStackTrace() } }
-        }, 1, 1, TimeUnit.SECONDS)
+        Flux.interval(Duration.ofSeconds(1))
+                .flatMapIterable { games.values }
+                .flatMap {
+                    it.tick()
+                }
+                .subscribe()
+
+        client.withGateway { gateway ->
+            gateway.eventDispatcher.on(MessageCreateEvent::class.java)
+                    .filterWhen { it.guild.hasElement() }
+                    .filter { it.message.content.startsWith(commandPrefix) }
+                    .flatMap { event ->
+                        event.guild.flatMap { guild ->
+                            commands[event.message.content.removePrefix(commandPrefix).toLowerCase()]?.let { action ->
+                                action(game(guild), event.message)
+                            }
+                        }
+                    }
+                    .subscribe()
+            gateway.eventDispatcher.on(ReactionAddEvent::class.java)
+                    .filterWhen { it.guild.hasElement() }
+                    .filter { it.member.isPresent }
+                    .flatMap { event ->
+                        event.guild.flatMap { guild ->
+                            event.message.flatMap { message ->
+                                game(guild).handleReaction(event.member.get(), message, event.emoji)
+                            }
+                        }
+                    }
+                    .subscribe()
+            gateway.onDisconnect()
+        }.block()
+
+
     }
 
     private fun game(guild: Guild): Game =
             games.getOrPut(guild, { Game(guild) })
-
-    override fun onGuildMessageReceived(event: GuildMessageReceivedEvent) {
-        if (event.message.contentRaw.startsWith(commandPrefix)) {
-            commands[event.message.contentRaw.removePrefix(commandPrefix).toLowerCase()]?.let { action ->
-                action(game(event.guild), event.message)
-            }
-        }
-    }
-
-    override fun onGuildMessageReactionAdd(event: GuildMessageReactionAddEvent) {
-        game(event.guild).handleReaction(event.member, event.reaction)
-    }
 }
