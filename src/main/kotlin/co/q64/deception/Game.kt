@@ -10,8 +10,6 @@ import discord4j.core.`object`.entity.Guild
 import discord4j.core.`object`.entity.Member
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.reaction.ReactionEmoji
-import discord4j.core.spec.GuildMemberEditSpec
-import discord4j.core.spec.TextChannelCreateSpec
 import discord4j.rest.util.Permission
 import discord4j.rest.util.PermissionSet
 import reactor.core.publisher.Flux
@@ -127,11 +125,25 @@ class Game(private val guild: Guild) {
     }
 
     fun mute(): Mono<Void> = Flux.fromIterable(players.map { it.member })
-            .flatMap { member -> member.edit { it.setMute(true) } }
+            .flatMap { member ->
+                member.voiceState.filter { it.channelId.isPresent }.flatMap { voice ->
+                    member.edit {
+                        it.setMute(true)
+                        it.setNewVoiceChannel(voice.channelId.get())
+                    }
+                }
+            }
             .then()
 
     fun unmute(): Mono<Void> = Flux.fromIterable(players.map { it.member })
-            .flatMap { member -> member.edit { it.setMute(false) } }
+            .flatMap { member ->
+                member.voiceState.filter { it.channelId.isPresent }.flatMap { voice ->
+                    member.edit {
+                        it.setMute(false)
+                        it.setNewVoiceChannel(voice.channelId.get())
+                    }
+                }
+            }
             .then()
 
     private fun inGame(member: Member?): Mono<Boolean> =
