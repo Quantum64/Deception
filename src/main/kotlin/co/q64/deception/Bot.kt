@@ -8,6 +8,8 @@ import discord4j.core.event.domain.message.MessageCreateEvent
 import discord4j.core.event.domain.message.ReactionAddEvent
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.publisher.toMono
+import reactor.kotlin.core.publisher.toMono
 import java.time.Duration
 
 private val commands = mapOf<String, (Game, Message) -> Mono<Void>>(
@@ -26,6 +28,11 @@ class Bot(token: String) {
                     .flatMapIterable { games.values }
                     .flatMap {
                         it.tick()
+                    }
+                    .onErrorResume { error ->
+                        Mono.just(error)
+                                .doOnNext { it.printStackTrace() }
+                                .then()
                     },
             client.withGateway { gateway ->
                 Mono.`when`(
@@ -36,8 +43,13 @@ class Bot(token: String) {
                                     event.guild.flatMap { guild ->
                                         commands[event.message.content.removePrefix(commandPrefix).toLowerCase()]?.let { action ->
                                             action(game(guild), event.message)
-                                        }
+                                        }.orEmpty()
                                     }
+                                }
+                                .onErrorResume { error ->
+                                    Mono.just(error)
+                                            .doOnNext { it.printStackTrace() }
+                                            .then()
                                 }
                                 .then(),
                         gateway.eventDispatcher.on(ReactionAddEvent::class.java)
@@ -49,6 +61,11 @@ class Bot(token: String) {
                                             game(guild).handleReaction(event.member.get(), message, event.emoji)
                                         }
                                     }
+                                }
+                                .onErrorResume { error ->
+                                    Mono.just(error)
+                                            .doOnNext { it.printStackTrace() }
+                                            .then()
                                 }
                                 .then(),
                         gateway.onDisconnect()

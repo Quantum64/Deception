@@ -10,5 +10,5 @@ enum class GameState(val generator: (Game) -> State) {
     OPERATION_INTRO({ OperationIntroState(it) }),
     OPERATION_START({ OperationStartState(it) }), OPERATION_ACTION({ OperationActionState(it) }), OPERATION_DISCUSS({ OperationDiscussState(it) }),
     ACCUSATION_INTRO({ AccusationIntroState(it) }),
-    //ACCUSATION, RESULTS;
+    ACCUSATION_VOTE({ AccusationVoteState(it) }), //RESULTS;
 }

@@ -11,7 +11,7 @@ class OperationIntroState(game: Game) : BasicState(game, 20) {
 
     override fun enter(): Mono<Void> = Flux.fromIterable(game.players)
             .flatMap { player ->
-                game.theme.operationIntro(game.selected?.member ?: player.member).flatMap { embed ->
+                game.theme.operationIntro().flatMap { embed ->
                     player.channel?.createEmbed { embed(it) }
                 }
             }

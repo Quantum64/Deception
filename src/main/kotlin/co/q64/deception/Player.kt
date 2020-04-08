@@ -10,6 +10,8 @@ class Player(val game: Game, val member: Member) {
     var channel: TextChannel? = null
     var role: Role = NoRole
     var operation: Operation = NoOperation
+    var votes = 0
     var receivedAssignment = false
     var receivedOperation = false
+    var voteCast = false
 }

@@ -10,7 +10,7 @@ class IntroState(game: Game) : BasicState(game, 60) {
     override val state = GameState.INTRO
 
     override fun enter(): Mono<Void> = Flux.fromIterable(game.players).flatMap { player ->
-        game.theme.intro(player).flatMap { embed ->
+        game.theme.intro().flatMap { embed ->
             player.channel?.createEmbed { embed(it) }
         }.flatMap { addReaction(it) }
     }.then()

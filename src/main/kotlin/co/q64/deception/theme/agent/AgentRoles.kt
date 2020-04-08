@@ -9,7 +9,7 @@ object RougeAgentRole : Role {
     override val description get() = "You are a Rouge Agent. The other VIRUS agents do not know that you are a double agent."
 
     override fun assign(game: Game) {
-        game.players.firstOrNull { it.role == NoRole && it.team == ServiceTeam }?.let {
+        game.players.firstOrNull { it.role == NoRole }?.let {
             it.role = this
             it.team = VirusTeam
         }

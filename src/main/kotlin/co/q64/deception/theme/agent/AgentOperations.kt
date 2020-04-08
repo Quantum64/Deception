@@ -1,6 +1,7 @@
 package co.q64.deception.theme.agent
 
 import co.q64.deception.Player
+import co.q64.deception.numbers
 import co.q64.deception.orEmpty
 import co.q64.deception.state.BasicState
 import co.q64.deception.theme.Operation
@@ -288,8 +289,6 @@ object SecretTipOperation : AgendaOperation {
         """.trimIndent())
     }
 }
-
-private val numbers = listOf("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣")
 
 private fun canSwitch(player: Player): Boolean = player.role != ServiceLoyalistRole && player.role != VirusLoyalistRole
 

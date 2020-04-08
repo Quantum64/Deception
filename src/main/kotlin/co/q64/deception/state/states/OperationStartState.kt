@@ -1,10 +1,12 @@
 package co.q64.deception.state.states
 
 import co.q64.deception.Game
+import co.q64.deception.orEmpty
 import co.q64.deception.state.BasicState
 import co.q64.deception.state.GameState
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.toMono
 
 class OperationStartState(game: Game) : BasicState(game, 45) {
     override val state get() = GameState.OPERATION_START
@@ -15,8 +17,7 @@ class OperationStartState(game: Game) : BasicState(game, 45) {
 
         return Flux
                 .fromIterable(game.players)
-                .map { it.channel }
-                .filter { it != null }
+                .flatMap { it.channel?.toMono().orEmpty() }
                 .flatMap {
                     it!!.createEmbed { embed ->
                         embed.setTitle(game.selected?.operation?.title ?: "Unknown Operation")

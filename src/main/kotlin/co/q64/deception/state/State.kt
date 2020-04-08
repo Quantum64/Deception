@@ -32,7 +32,7 @@ abstract class BasicState(val game: Game, var timer: Int = -1) : State {
         }
         if (timer > 0) {
             if (timer % 2 == 0) {
-                return Flux.fromIterable(messages).flatMap { updateMessage(it) }.then()
+                return Flux.fromIterable(messages.filterNotNull()).flatMap { updateMessage(it) }.then()
             }
             return Mono.empty()
         }
