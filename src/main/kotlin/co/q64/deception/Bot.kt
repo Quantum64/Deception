@@ -9,6 +9,7 @@ import discord4j.core.event.domain.message.ReactionAddEvent
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.publisher.toMono
+import reactor.core.scheduler.Schedulers
 import reactor.kotlin.core.publisher.toMono
 import java.time.Duration
 
@@ -25,6 +26,7 @@ class Bot(token: String) {
 
     fun start(): Mono<Void> = Mono.`when`(
             Flux.interval(Duration.ofSeconds(1))
+                    .publishOn(Schedulers.elastic())
                     .flatMapIterable { games.values }
                     .flatMap {
                         it.tick()
