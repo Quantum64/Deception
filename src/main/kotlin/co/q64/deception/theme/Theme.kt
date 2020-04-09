@@ -1,6 +1,7 @@
 package co.q64.deception.theme
 
 import co.q64.deception.Game
+import co.q64.deception.Player
 import discord4j.core.`object`.entity.Member
 import discord4j.core.spec.EmbedCreateSpec
 import reactor.core.publisher.Mono
@@ -27,4 +28,11 @@ interface Theme {
     fun accusationIntro(game: Game): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationVote(reactions: String): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationComplete(member: Member): Mono<(EmbedCreateSpec) -> Unit>
+    fun resultsVotes(player: Player, emoji: String): Mono<(EmbedCreateSpec) -> Unit>
+    fun resultsNoSelection(): Mono<(EmbedCreateSpec) -> Unit>
+    fun resultsSelected(target: Player): Mono<(EmbedCreateSpec) -> Unit>
+    fun resultsListEntry(target: Player): String
+
+    fun calculateVotes(player: Player): Int
+    fun winner(player: Player, selected: Player?): Boolean
 }

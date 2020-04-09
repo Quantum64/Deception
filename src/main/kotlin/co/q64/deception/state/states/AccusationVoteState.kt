@@ -3,7 +3,6 @@ package co.q64.deception.state.states
 import co.q64.deception.Game
 import co.q64.deception.numbers
 import co.q64.deception.orEmpty
-import co.q64.deception.reply
 import co.q64.deception.state.BasicState
 import co.q64.deception.state.GameState
 import discord4j.core.`object`.entity.Member
@@ -13,7 +12,7 @@ import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.toFlux
 import reactor.kotlin.core.publisher.toMono
 
-class AccusationVoteState(game: Game) : BasicState(game, 30) {
+class AccusationVoteState(game: Game) : BasicState(game, 60) {
     override val state = GameState.ACCUSATION_INTRO
 
     override fun enter(): Mono<Void> = game.players.toFlux()
@@ -26,10 +25,14 @@ class AccusationVoteState(game: Game) : BasicState(game, 30) {
                                 .joinToString("\n")
                 ).flatMap { embed ->
                     player.channel?.createEmbed { embed(it) }
+                }.flatMap { message ->
+                    (game.players.filter { it != player }.indices).toFlux()
+                            .flatMap { message.addReaction(ReactionEmoji.unicode(numbers[it])) }
+                            .then()
                 }
             }
-            .flatMap { addReaction(it) }
             .then()
+
 
     override fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> =
             super.handleReaction(member, message, reaction).then(
@@ -59,10 +62,9 @@ class AccusationVoteState(game: Game) : BasicState(game, 30) {
                     }.then())
 
     override fun exit(): Mono<Void> = super.exit().and(game.unmute())
-    override fun timeout(): Mono<Void> = game.enter(GameState.OPERATION_START).doFirst {
-        game.players.filter { !it.voteCast }.forEach { player ->
-            game.players.shuffled().first { it != player }.votes++
-            player.voteCast = true
-        }
-    }
+    override fun timeout(): Mono<Void> =
+            game.players.toFlux().filter { !it.voteCast }.doOnNext { player ->
+                game.players.shuffled().first { it != player }.votes++
+                player.voteCast = true
+            }.then(game.enter(GameState.ACCUSATION_RESULTS))
 }

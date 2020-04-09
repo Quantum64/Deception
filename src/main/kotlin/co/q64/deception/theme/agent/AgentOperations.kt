@@ -17,6 +17,7 @@ import reactor.kotlin.core.publisher.toMono
 // Templates
 interface AgendaOperation : Operation {
     override val title get() = "Hidden Agenda"
+    override fun canAssign(player: Player): Boolean = player.game.players.none { it.operation is AgendaOperation }
     override fun description(player: Player) = "${player.member.mention} gets new orders from up top. " +
             "${player.member.mention} could flip sides, get a new win condition, or simply gain information about another agent."
 }
@@ -105,9 +106,8 @@ object AnonymousTipOperation : Operation {
             player.game.players.shuffled().firstOrNull { it != player }?.toMono().orEmpty()
                     .map { target ->
                         { embed: EmbedCreateSpec ->
-                            embed.setDescription("""
-                                Your source reveals that ${target.member.mention} is with **${apparentTeam(player).name}**
-                            """.trimIndent())
+                            embed.setDescription(" After meeting your source at a very remote location, they finally spill the beans. " +
+                                    "You now know that ${target.member.mention} works for **${apparentTeam(player).name}.**")
                             Unit
                         }
                     }
@@ -119,18 +119,16 @@ object DanishIntelligenceOperation : Operation {
     override fun description(player: Player) = "${player.member.mention} intercepts a transmission with two names. One is a virus agent and one is not."
 
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> =
-            // TODO Should this use apparent or actual team?
+            // TODO Should this use apparent or actual team? update: probably not
             listOf(
-                    player.game.players.shuffled().firstOrNull { it != player && apparentTeam(it) == VirusTeam },
-                    player.game.players.shuffled().firstOrNull { it != player && apparentTeam(it) == ServiceTeam }
+                    player.game.players.shuffled().firstOrNull { it != player && it.team == VirusTeam },
+                    player.game.players.shuffled().firstOrNull { it != player && it.team == ServiceTeam }
             ).shuffled().toMono()
                     .map { targets ->
                         { embed: EmbedCreateSpec ->
-                            embed.setDescription("""
-                                The transmission reveals that one of the following two players is a VIRUS agent, and one is not.
-                                ${targets[0]?.member?.mention ?: "Unknown"}
-                                ${targets[1]?.member?.mention ?: "Unknown"}
-                            """.trimIndent())
+                            embed.setDescription("The transmission names ${targets[0]?.member?.mention ?: "Unknown"} and " +
+                                    "${targets[1]?.member?.mention ?: "Unknown"}. One of them is a VIRUS agent and the other is not. " +
+                                    "Too bad you aren't good enough at Danish to know who is on what team.")
                             Unit
                         }
                     }
@@ -153,18 +151,18 @@ object OldPhotographsOperation : Operation {
 object DeepUndercoverOperation : SelectOperation { // TODO again, actual or apparent team?
     override val title get() = "Deep Undercover"
     override fun description(player: Player) = "${player.member.mention} picks one agent to discover their true agency. " +
-            "If they turn out to be a virus agent, the ${player.member.mention} will join their cause."
+            "If they turn out to be a VIRUS agent, ${player.member.mention} will join their cause."
 
     override fun prompt(player: Player) = "Pick an agent and discover their identity. If they are a VIRUS agent, you will join their cause, otherwise you stay in the same agency."
     override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
             Mono.just((
                     if (selected.team == VirusTeam) {
                         "You now know that ${selected.member.mention} is a **${VirusTeam.name}** agent." + (if (player.role == ServiceLoyalistRole) {
-                            "\n\nYou would have switched to **${selected.team.name}**, but you are a __${player.role.name}__, so your agency has not changed."
+                            "\nYou would have switched to **${selected.team.name}**, but you are a __${player.role.name}__, so your agency has not changed.\n"
                         } else {
-                            "\n\nIf you weren't before, you are now working for **${VirusTeam.name}**."
+                            "\nIf you weren't before, you are now working for **${VirusTeam.name}**.\n"
                         })
-                    } else "You now know that ${selected.member.mention} is with **${selected.team.name}**.") + "\nReact with ✅ when you have read this message.")
+                    } else "You now know that ${selected.member.mention} is with **${selected.team.name}**.\n") + "\nReact with ✅ when you have read this message.")
                     .doOnEach {
                         if (selected.team == VirusTeam && player.role != ServiceLoyalistRole) {
                             player.team = VirusTeam
@@ -180,7 +178,7 @@ object UnfortunateEncounterOperation : SelectOperation {
     override val title get() = "Unfortunate Encounter"
     override fun description(player: Player) = "${player.member.mention} picks one agent. They will both see whether both or either of them works for VIRUS."
 
-    override fun prompt(player: Player) = "Select an agent. You will both see if both of you or either of you works for VIRUS."
+    override fun prompt(player: Player) = "Pick a player and the two of you will see if at least one of you is part of VIRUS."
 
     override fun select(state: BasicState, player: Player, selected: Player): Mono<Void> =
             listOf(player, selected).shuffled().map { it.member.mention }.toMono()
@@ -199,7 +197,21 @@ object UnfortunateEncounterOperation : SelectOperation {
                     .then()
 }
 
-// TODO Incriminating Evidence
+class IncriminatingEvidenceOperation : Operation {
+    override val title get() = "Incriminating Evidence"
+    override fun description(player: Player) = "${player.member.mention} must choose another player who will either add one vote against " +
+            "${player.member.mention} or shields ${player.member.mention} from a single vote in the accusation phase."
+
+    var action: Action? = null
+
+    override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> {
+        TODO("not implemented")
+    }
+
+    enum class Action {
+        ADD, SHIELD
+    }
+}
 
 object DefectorOperation : Operation {
     override val title get() = "Defector"
@@ -243,17 +255,20 @@ object ScapegoatOperation : AgendaOperation {
     }
 }
 
-class GrudgeOperation(private val target: Player) : AgendaOperation {
+class GrudgeOperation(val target: Player) : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
         message.setTitle("Grudge").setDescription("""
-            You have a grudge against ${target.member.mention}
+            You now win if and only if ${target.member.mention} is imprisoned.
+            Just look at ${target.member.mention}'s ugly face. Nothing matters except their utter humiliation.
+            
+            Tip: Try telling the others that you got a Secret Tip that ${target.member.mention} is VIRUS.
         """.trimIndent())
     }
 
     override fun canAssign(player: Player) = player != target
 }
 
-class InfatuationOperation(private val target: Player) : AgendaOperation {
+class InfatuationOperation(val target: Player) : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
         message.setTitle("Infatuation").setDescription("""
             You are love with ${target.member.mention}

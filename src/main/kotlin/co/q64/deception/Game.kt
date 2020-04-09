@@ -146,11 +146,12 @@ class Game(private val guild: Guild) {
             }
             .then()
 
-    private fun inGame(member: Member?): Mono<Boolean> =
-            Mono.just(players.map { it.member }.any { it == member })
-
-    private fun deleteChannels(): Mono<Void> = guild.channels
+    fun deleteChannels(): Mono<Void> = guild.channels
             .filter { it.name.startsWith(theme.channelPrefix) }
             .flatMap { it.delete() }
             .then()
+
+    private fun inGame(member: Member?): Mono<Boolean> =
+            Mono.just(players.map { it.member }.any { it == member })
+
 }

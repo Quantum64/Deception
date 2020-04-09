@@ -78,6 +78,61 @@ object AgentTheme : Theme {
         embed.setTitle("Complete").setDescription("Voted for ${member.mention}")
     }
 
+    override fun resultsVotes(player: Player, emoji: String): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setDescription("${player.member.mention} received $emoji votes.")
+    }
+
+    override fun resultsNoSelection(): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setDescription("No one was imprisoned.")
+    }
+
+    override fun resultsSelected(target: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setDescription("${target.member.mention} was imprisoned and ${target.member.mention} worked for **${target.team.name}**.")
+    }
+
+    override fun resultsListEntry(target: Player): String = "${target.member.mention} [**" +
+            when (target.team) {
+                target.startingTeam -> target.team.name
+                else -> "${target.startingTeam.name} -> ${target.team.name}"
+            } + "**] " +
+            when (target.role.display) {
+                true -> "(__${target.role.name}__) "
+                else -> ""
+            } +
+            target.operation.let { operation ->
+                when (operation) {
+                    is ScapegoatOperation -> "Wanted to be imprisoned"
+                    is GrudgeOperation -> "Wanted ${operation.target.member.mention} to be imprisoned"
+                    is InfatuationOperation -> "Wanted ${operation.target.member.mention} to win"
+                    else -> ""
+                }
+            }
+
+
+    override fun calculateVotes(player: Player) = player.votes + player.operation.let { operation ->
+        when (operation) {
+            is IncriminatingEvidenceOperation -> when {
+                operation.action == IncriminatingEvidenceOperation.Action.ADD -> 1
+                operation.action == IncriminatingEvidenceOperation.Action.SHIELD && player.votes > 0 -> -1
+                else -> 0
+            }
+            else -> 0
+        }
+    }
+
+    override fun winner(player: Player, selected: Player?): Boolean = (selected?.team ?: ServiceTeam).let { team ->
+        player.operation.let { operation ->
+            when {
+                operation is ScapegoatOperation -> player == selected
+                selected?.operation is ScapegoatOperation -> false
+                operation is InfatuationOperation -> winner(operation.target, selected)
+                operation is GrudgeOperation -> operation.target == selected
+                player.team == team.other -> true
+                else -> false
+            }
+        }
+    }
+
     override fun generateRoles(): List<Role> = listOf(
             RougeAgentRole,
             TripleAgentRole,
