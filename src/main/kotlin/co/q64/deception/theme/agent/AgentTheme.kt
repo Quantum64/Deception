@@ -7,6 +7,7 @@ import co.q64.deception.theme.Role
 import co.q64.deception.theme.Theme
 import discord4j.core.`object`.entity.Member
 import discord4j.core.spec.EmbedCreateSpec
+import org.atteo.evo.inflector.English
 import reactor.core.publisher.Mono
 import java.util.concurrent.ThreadLocalRandom
 
@@ -20,14 +21,14 @@ object AgentTheme : Theme {
     override fun traitorCount(players: Int) = 2
     override fun roleCount(players: Int) = (if (players > 5) 2 else 1) + ThreadLocalRandom.current().nextInt(3)
 
-    override fun intro(): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+    override fun intro(game: Game): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
         embed.setTitle("Mission Overview")
-                .setDescription("You've received intelligence that 2 of the 5 of you are double agents working for ${VirusTeam.name}! " +
+                .setDescription("You've received intelligence that 2 of the ${game.players.size} of you are double agents working for ${VirusTeam.name}! " +
                         "Your briefing agent will tell you which agency you work for and your objective. You can only imprison one person so make sure " +
                         "it's the right one. Remember each other's names, review the below agencies, and figure out who is lying about who they are." + """
                             
-                            **The service**  
-                            **VIRUS**
+                            **${ServiceTeam.name}**  
+                            **${VirusTeam.name}**
                             
                             React with ✅ when you have read this message.
                         """.trimIndent())
@@ -65,21 +66,21 @@ object AgentTheme : Theme {
     }
 
     override fun accusationIntro(game: Game): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
-        embed.setTitle("Discussion Phase").setDescription("Discuss\n\n" +
-                game.players.joinToString("\n") { "${it.member.mention} (${it.operation.title})" } +
+        embed.setTitle("Discussion Phase").setDescription(game.players.joinToString("\n") { "${it.member.mention} (${it.operation.title})" } +
                 "\n\nReact with ✅ when you have completed the discussion.")
     }
 
     override fun accusationVote(reactions: String): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
-        embed.setTitle("Vote").setDescription("Pick one\n\n$reactions")
+        embed.setTitle("Vote").setDescription("Whoever has the most votes of suspicion will be imprisoned. " +
+                "If they are a VIRUS double agent, The Service wins, otherwise the VIRUS agents win.\n\n$reactions")
     }
 
     override fun accusationComplete(member: Member): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
         embed.setTitle("Complete").setDescription("Voted for ${member.mention}")
     }
 
-    override fun resultsVotes(player: Player, emoji: String): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
-        embed.setDescription("${player.member.mention} received $emoji votes.")
+    override fun resultsVotes(player: Player, count: Int, emoji: String): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setDescription("${player.member.mention} received $emoji ${English.plural("vote", count)}.")
     }
 
     override fun resultsNoSelection(): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->

@@ -15,7 +15,6 @@ class AccusationResultsState(game: Game) : BasicState(game, 500) {
 
     private val remaining = game.players.toMutableList()
 
-    //private val sent = mutableListOf<Message>()
     private var phase: ResultsPhase = ResultsPhase.REVEAL
     private var selected: Player? = null
     private var counter = 0;
@@ -41,7 +40,7 @@ class AccusationResultsState(game: Game) : BasicState(game, 500) {
                         val next = remaining.minBy { game.theme.calculateVotes(it) }!!
                         remaining.remove(next)
                         game.players.toFlux().flatMap { player ->
-                            game.theme.resultsVotes(next, numbers[game.theme.calculateVotes(next)]).flatMap { embed ->
+                            game.theme.resultsVotes(next, game.theme.calculateVotes(next), numbers[game.theme.calculateVotes(next)]).flatMap { embed ->
                                 player?.channel?.createEmbed(embed).orEmpty()
                             }
                         }.then()
@@ -56,15 +55,34 @@ class AccusationResultsState(game: Game) : BasicState(game, 500) {
                             }
                         }.doOnComplete { phase = ResultsPhase.LIST }.then()
                     }
+                    phase == ResultsPhase.LIST -> {
+                        game.players.toFlux().flatMap { player ->
+                            player.channel?.createEmbed { embed ->
+                                embed.setDescription("__WINNERS__\n" + game.players
+                                        .filter { game.theme.winner(it, selected) }
+                                        .joinToString("\n") { game.theme.resultsListEntry(it) } +
+                                        "\n\n__LOSERS__\n" + game.players
+                                        .filter { !game.theme.winner(it, selected) }
+                                        .joinToString("\n") { game.theme.resultsListEntry(it) })
+                            }.orEmpty()
+                        }.doOnComplete { phase = ResultsPhase.END }.then()
+                    }
+                    phase == ResultsPhase.END -> {
+                        game.players.toFlux().flatMap { player ->
+                            player.channel?.createEmbed { embed ->
+                                embed.setTitle("Game Over").setDescription("React with ✅ to end the game.")
+                            }.orEmpty().flatMap { addReaction(it) }
+                        }.doOnComplete { phase = ResultsPhase.STOP }.then()
+                    }
                     else -> Mono.empty()
                 }
             }
     ).then()
 
-    override fun timeout() = game.toMono().doOnNext {
+    override fun timeout(): Mono<Void> = game.toMono().doOnNext {
         it.players.clear()
         it.state = WaitingState
-    }.and(game.unmute()).and(game.deleteChannels())
+    }.and(game.undeafen()).and(game.deleteChannels())
 }
 
 private enum class ResultsPhase {

@@ -144,7 +144,7 @@ object OldPhotographsOperation : Operation {
         if (first == null || second == null) {
             return Mono.just { embed -> embed.setDescription("There are not enough agents to provide you with any useful information.") }
         }
-        return Mono.just { embed -> embed.setDescription("Evidence reveals that ${first.member.mention} and ${second.member.mention} started on the same team.") }
+        return Mono.just { embed -> embed.setDescription("The photos show that that ${first.member.mention} and ${second.member.mention} worked for the same agency at the start.") }
     }
 }
 
@@ -215,14 +215,15 @@ class IncriminatingEvidenceOperation : Operation {
 
 object DefectorOperation : Operation {
     override val title get() = "Defector"
+    override val automatic get() = false
     override fun description(player: Player) = "${player.member.mention} may defect and join the other agency. A VIRUS defector loses if any other VIRUS agent votes for them. A Service defector can't vote."
     override fun canAssign(player: Player) = player.role != ServiceLoyalistRole && player.role != VirusLoyalistRole
 
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
-        embed.setDescription("You are currently working for **${player.team.name}**. Defecting comes at a cost: " +
+        embed.setDescription("You are currently working for **${player.team.name}**. " +
                 (if (player.team == ServiceTeam)
-                    "You won't get to vote in the accusation phase." else
-                    "You will lose if any VIRUS agent votes for you.") + "\n\n" +
+                    "Defecting comes at a cost: You won't get to vote in the accusation phase." else
+                    "Defecting is risky: You lose immediately if any other VIRUS agent votes for you.") + "\n\n" +
                 "\uD83D\uDFE2 - Stay the same\n" +
                 "\uD83D\uDFE5 - Defect"
         )
@@ -271,7 +272,10 @@ class GrudgeOperation(val target: Player) : AgendaOperation {
 class InfatuationOperation(val target: Player) : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
         message.setTitle("Infatuation").setDescription("""
-            You are love with ${target.member.mention}
+            You now win if and only if ${target.member.mention} wins at the end of the round.
+            You have fallen madly in love with ${target.member.mention}. Their happiness is the only thing that matters.
+            
+            Tip: Try figuring out which team ${target.member.mention} is on and help them win in any way possible.
         """.trimIndent())
     }
 
@@ -287,9 +291,7 @@ object SleeperAgentOperation : AgendaOperation {
             """.trimIndent())
             player.team = player.team.other
         } else {
-            message.setDescription("""
-                You would have switches sides, but you are a __${player.role.name}__ so you are still with **${player.team.name}**.
-            """.trimIndent())
+            message.setDescription("You receive an activation message, but your loyalty to your agency is unwavering. You still work for **${player.team.name}**.")
         }
     }
 }

@@ -15,7 +15,7 @@ class OperationActionState(game: Game) : BasicState(game, 60) {
     override val state get() = GameState.OPERATION_ACTION
 
     override fun enter(): Mono<Void> =
-            game.mute().and(
+            game.deafen().and(
                     game.players.toFlux()
                             .filter { it != game.selected }
                             .flatMap { player ->
@@ -46,6 +46,6 @@ class OperationActionState(game: Game) : BasicState(game, 60) {
                     .then())
 
 
-    override fun exit(): Mono<Void> = super.exit().and(game.unmute())
+    override fun exit(): Mono<Void> = super.exit().and(game.undeafen())
     override fun timeout() = game.enter(GameState.OPERATION_DISCUSS)
 }

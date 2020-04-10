@@ -9,7 +9,7 @@ import reactor.kotlin.core.publisher.toFlux
 class AssignmentMessageState(game: Game) : BasicState(game, 30) {
     override val state get() = GameState.ASSIGNMENT_MESSAGE
 
-    override fun enter(): Mono<Void> = game.mute().and(
+    override fun enter(): Mono<Void> = game.deafen().and(
             game.players.toFlux()
                     .filter { it != game.selected }
                     .flatMap { player ->
@@ -28,6 +28,6 @@ class AssignmentMessageState(game: Game) : BasicState(game, 30) {
                     }.flatMap { addReaction(it) }
     )
 
-    override fun exit(): Mono<Void> = super.exit().and(game.unmute())
+    override fun exit(): Mono<Void> = super.exit().and(game.undeafen())
     override fun timeout() = game.enter(GameState.ASSIGNMENT_DISCUSS)
 }

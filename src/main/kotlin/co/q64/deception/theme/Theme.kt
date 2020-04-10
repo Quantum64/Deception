@@ -18,7 +18,7 @@ interface Theme {
     fun generateRoles(): List<Role>
     fun generateOperations(game: Game): List<Operation>
 
-    fun intro(): Mono<(EmbedCreateSpec) -> Unit>
+    fun intro(game: Game): Mono<(EmbedCreateSpec) -> Unit>
     fun roleAssignmentStart(member: Member): Mono<(EmbedCreateSpec) -> Unit>
     fun roleAssignmentWait(member: Member): Mono<(EmbedCreateSpec) -> Unit>
     fun roleAssignmentDiscuss(member: Member): Mono<(EmbedCreateSpec) -> Unit>
@@ -28,7 +28,7 @@ interface Theme {
     fun accusationIntro(game: Game): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationVote(reactions: String): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationComplete(member: Member): Mono<(EmbedCreateSpec) -> Unit>
-    fun resultsVotes(player: Player, emoji: String): Mono<(EmbedCreateSpec) -> Unit>
+    fun resultsVotes(player: Player, count: Int, emoji: String): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsNoSelection(): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsSelected(target: Player): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsListEntry(target: Player): String

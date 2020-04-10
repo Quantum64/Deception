@@ -1,6 +1,7 @@
 package co.q64.deception.state.states
 
 import co.q64.deception.Game
+import co.q64.deception.orEmpty
 import co.q64.deception.state.BasicState
 import co.q64.deception.state.GameState
 import reactor.core.publisher.Flux
@@ -10,8 +11,8 @@ class IntroState(game: Game) : BasicState(game, 60) {
     override val state = GameState.INTRO
 
     override fun enter(): Mono<Void> = Flux.fromIterable(game.players).flatMap { player ->
-        game.theme.intro().flatMap { embed ->
-            player.channel?.createEmbed { embed(it) }
+        game.theme.intro(game).flatMap { embed ->
+            player.channel?.createEmbed { embed(it) }.orEmpty()
         }.flatMap { addReaction(it) }
     }.then()
 

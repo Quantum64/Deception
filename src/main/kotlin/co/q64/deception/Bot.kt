@@ -10,17 +10,27 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
+import java.util.logging.Level
 import java.util.logging.Logger
 
 private val commands = mapOf<String, (Game, Message) -> Mono<Void>>(
+        "help" to { _, m -> m.reply(help).then() },
         "join" to { g, m -> g.join(m) },
         "leave" to { g, m -> g.leave(m) },
         "start" to { g, m -> g.start(m) },
         "end" to { g, m -> g.end(m) }
 )
 
+private val help = """
+    These are the commands that I know
+    **+join**: Join a waiting game
+    **+join**: Leave a waiting game
+    **+start**: Start the game
+    **+end**: End the game
+""".trimIndent()
+
 class Bot(token: String) {
-    private val logger = Logger.getLogger("timer")
+    private val logger = Logger.getLogger("game")
     private val games: MutableMap<Guild, Game> = mutableMapOf()
     private val client: DiscordClient = DiscordClientBuilder.create(token).build()
 
@@ -30,7 +40,7 @@ class Bot(token: String) {
                     .flatMap {
                         it.tick().onErrorResume { error ->
                             Mono.just(error)
-                                    .doOnNext { exception -> exception.printStackTrace() }
+                                    .doOnNext { exception -> logger.log(Level.SEVERE, "Exception in timer tick", exception) }
                                     .then()
                         }
                     },
@@ -46,7 +56,7 @@ class Bot(token: String) {
                                         }.orEmpty()
                                     }.onErrorResume { error ->
                                         Mono.just(error)
-                                                .doOnNext { it.printStackTrace() }
+                                                .doOnNext { exception -> logger.log(Level.SEVERE, "Exception in command processor", exception) }
                                                 .then()
                                     }
                                 }
@@ -61,7 +71,7 @@ class Bot(token: String) {
                                         }
                                     }.onErrorResume { error ->
                                         Mono.just(error)
-                                                .doOnNext { it.printStackTrace() }
+                                                .doOnNext { exception -> logger.log(Level.SEVERE, "Exception in reaction processor", exception) }
                                                 .then()
                                     }
                                 }

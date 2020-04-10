@@ -15,7 +15,7 @@ import reactor.kotlin.core.publisher.toMono
 class AccusationVoteState(game: Game) : BasicState(game, 60) {
     override val state = GameState.ACCUSATION_INTRO
 
-    override fun enter(): Mono<Void> = game.players.toFlux()
+    override fun enter(): Mono<Void> = game.deafen().and(game.players.toFlux()
             .flatMap { player ->
                 game.theme.accusationVote(
                         game.players
@@ -28,9 +28,9 @@ class AccusationVoteState(game: Game) : BasicState(game, 60) {
                 }.flatMap { message ->
                     (game.players.filter { it != player }.indices).toFlux()
                             .flatMap { message.addReaction(ReactionEmoji.unicode(numbers[it])) }
-                            .then()
+                            .then(add(message))
                 }
-            }
+            })
             .then()
 
 
@@ -49,19 +49,19 @@ class AccusationVoteState(game: Game) : BasicState(game, 60) {
                                     .flatMap { target ->
                                         target.votes++
                                         player.voteCast = true
-                                        message.removeAllReactions()
+                                        message.removeAllReactions().then(message.toMono()
                                                 .flatMap { message.channel }
                                                 .flatMap { channel ->
                                                     game.theme.accusationComplete(target.member).flatMap { embed ->
                                                         channel.createEmbed { embed(it) }
                                                     }
-                                                }.flatMap { addReaction(it) }
+                                                }.flatMap { addReaction(it) })
                                     }
                                     .then()
                         }
                     }.then())
 
-    override fun exit(): Mono<Void> = super.exit().and(game.unmute())
+    override fun exit(): Mono<Void> = super.exit().and(game.undeafen())
     override fun timeout(): Mono<Void> =
             game.players.toFlux().filter { !it.voteCast }.doOnNext { player ->
                 game.players.shuffled().first { it != player }.votes++

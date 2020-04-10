@@ -1,10 +1,12 @@
 package co.q64.deception
 
+import reactor.core.publisher.Hooks
 import reactor.kotlin.core.publisher.toMono
 import java.io.File
 import java.nio.file.Files
 
 fun main() {
+    Hooks.onOperatorDebug()
     File("token").run {
         if (!exists()) {
             println("File 'token' not found!")
