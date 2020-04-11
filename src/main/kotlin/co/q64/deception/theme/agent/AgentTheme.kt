@@ -12,13 +12,13 @@ import reactor.core.publisher.Mono
 import java.util.concurrent.ThreadLocalRandom
 
 object AgentTheme : Theme {
-    override val minPlayers = 5
+    override val minPlayers = 3
     override val maxPlayers = 9
 
     override val player get() = ServiceTeam
     override val traitor get() = VirusTeam
 
-    override fun traitorCount(players: Int) = 2
+    override fun traitorCount(players: Int) = 5
     override fun roleCount(players: Int) = (if (players > 5) 2 else 1) + ThreadLocalRandom.current().nextInt(3)
 
     override fun intro(game: Game): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
@@ -27,8 +27,9 @@ object AgentTheme : Theme {
                         "Your briefing agent will tell you which agency you work for and your objective. You can only imprison one person so make sure " +
                         "it's the right one. Remember each other's names, review the below agencies, and figure out who is lying about who they are." + """
                             
-                            **${ServiceTeam.name}**  
-                            **${VirusTeam.name}**
+                        The agencies:
+                         -  **${ServiceTeam.name}**
+                         -  **${VirusTeam.name}**
                             
                             React with ✅ when you have read this message.
                         """.trimIndent())

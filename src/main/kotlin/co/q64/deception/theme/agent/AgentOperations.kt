@@ -17,6 +17,7 @@ import reactor.kotlin.core.publisher.toMono
 // Templates
 interface AgendaOperation : Operation {
     override val title get() = "Hidden Agenda"
+    override val image get() = "https://raw.githubusercontent.com/google/material-design-icons/master/communication/2x_web/ic_email_white_48dp.png"
     override fun canAssign(player: Player): Boolean = player.game.players.none { it.operation is AgendaOperation }
     override fun description(player: Player) = "${player.member.mention} gets new orders from up top. " +
             "${player.member.mention} could flip sides, get a new win condition, or simply gain information about another agent."
@@ -236,23 +237,27 @@ object DefectorOperation : Operation {
 
     override fun handleReaction(player: Player, message: Message, state: BasicState, reaction: ReactionEmoji): Mono<Void> =
             reaction.toMono()
-                    .doOnEach { state.timer = 1 }
+                    .doOnNext { state.timer = 1 }
                     .filter { it.asUnicodeEmoji().isPresent }
                     .map { it.asUnicodeEmoji().get().raw }
-                    .filter { it == "\uD83D\uDFE5" }
-                    .doOnEach { player.team = player.team.other }
+                    .filter {
+                        it == "\uD83D\uDFE5"
+                    }
+                    .doOnNext {
+                        player.team = player.team.other
+                    }
                     .then()
 }
 
 // Hidden Agendas
 object ScapegoatOperation : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
-        message.setTitle("Scapegoat").setDescription("""
+        message.setTitle("Operation: Scapegoat").setDescription("""
         You now win if and only if you yourself are imprisoned. Try to trick the other agents into voting for you in the accusation phase.
         If you succeed The Service and VIRUS agents lose. Your agency is still the same.
         
         Tip: Try telling everyone you were VIRUS but are now part of The Service.
-    """.trimIndent())
+    """.trimIndent())//.setThumbnail(email)
     }
 }
 
@@ -263,7 +268,7 @@ class GrudgeOperation(val target: Player) : AgendaOperation {
             Just look at ${target.member.mention}'s ugly face. Nothing matters except their utter humiliation.
             
             Tip: Try telling the others that you got a Secret Tip that ${target.member.mention} is VIRUS.
-        """.trimIndent())
+        """.trimIndent())//.setThumbnail(email)
     }
 
     override fun canAssign(player: Player) = player != target
@@ -276,7 +281,7 @@ class InfatuationOperation(val target: Player) : AgendaOperation {
             You have fallen madly in love with ${target.member.mention}. Their happiness is the only thing that matters.
             
             Tip: Try figuring out which team ${target.member.mention} is on and help them win in any way possible.
-        """.trimIndent())
+        """.trimIndent())//.setThumbnail(email)
     }
 
     override fun canAssign(player: Player) = player != target
@@ -293,6 +298,7 @@ object SleeperAgentOperation : AgendaOperation {
         } else {
             message.setDescription("You receive an activation message, but your loyalty to your agency is unwavering. You still work for **${player.team.name}**.")
         }
+        message//.setThumbnail(email)
     }
 }
 
@@ -300,10 +306,10 @@ object SecretTipOperation : AgendaOperation {
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { message ->
         val target = player.game.players.shuffled().first { it != player }
         message.setTitle("Secret Tip").setDescription("""
-            You get a strange phone call. It reveals that ${target.member.mention} works for **${apparentTeam(target)}**.
+            You get a strange phone call. It reveals that ${target.member.mention} works for **${apparentTeam(target).name}**.
             
             Tip: Try lying about your info to see how the agent reacts to being accused.
-        """.trimIndent())
+        """.trimIndent())//.setThumbnail(email)
     }
 }
 
@@ -314,3 +320,5 @@ private fun apparentTeam(player: Player): Team = when (player.role) {
     is SuspiciousAgentRole -> VirusTeam
     else -> player.team
 }
+
+private const val email = "https://raw.githubusercontent.com/google/material-design-icons/master/communication/2x_web/ic_email_white_48dp.png"

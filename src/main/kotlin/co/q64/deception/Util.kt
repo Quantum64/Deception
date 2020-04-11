@@ -16,3 +16,5 @@ fun <T> Mono<T>?.orEmpty(): Mono<T> = this ?: Mono.empty()
 fun <T> Mono<*>?.thenEmpty(): Mono<T> = this?.then(Mono.empty()) ?: Mono.empty()
 
 fun String.titleCase(): String = split(" ").joinToString(" ") { it.capitalize() }
+
+fun color(r: Int, b: Int, g: Int) = ((r and 0x0ff) shl 16) or ((g and 0x0ff) shl 8) or (b and 0x0ff);

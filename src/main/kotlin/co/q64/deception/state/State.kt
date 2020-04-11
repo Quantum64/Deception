@@ -1,6 +1,7 @@
 package co.q64.deception.state
 
 import co.q64.deception.Game
+import co.q64.deception.orEmpty
 import discord4j.core.`object`.entity.Member
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.reaction.ReactionEmoji
@@ -66,11 +67,12 @@ abstract class BasicState(val game: Game, var timer: Int = -1) : State {
                         embed.title.ifPresent { new.setTitle(it) }
                         embed.description.ifPresent { new.setDescription(it) }
                         embed.color.ifPresent { new.setColor(it) }
+                        embed.thumbnail.ifPresent { new.setThumbnail(it.url) }
                         new.setFooter("The game will continue in $timer ${English.plural("second", timer)}. " +
                                 "${ready.size}/$neededToContinue players ready.", null)
                     }
                 }.then()
-            } ?: Mono.just(true).then()
+            }.orEmpty()
 
     private val neededToContinue get() = if (required > 0) required else game.players.size
 }

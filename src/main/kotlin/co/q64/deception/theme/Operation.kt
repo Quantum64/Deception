@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono
 
 interface Operation {
     val title: String
+    val image: String? get() = null
     val automatic: Boolean get() = true
     fun description(player: Player): String
     fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit>
