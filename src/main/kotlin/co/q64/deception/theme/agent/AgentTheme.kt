@@ -12,13 +12,13 @@ import reactor.core.publisher.Mono
 import java.util.concurrent.ThreadLocalRandom
 
 object AgentTheme : Theme {
-    override val minPlayers = 3
+    override val minPlayers = 5
     override val maxPlayers = 9
 
     override val player get() = ServiceTeam
     override val traitor get() = VirusTeam
 
-    override fun traitorCount(players: Int) = 5
+    override fun traitorCount(players: Int) = 2
     override fun roleCount(players: Int) = (if (players > 5) 2 else 1) + ThreadLocalRandom.current().nextInt(3)
 
     override fun intro(game: Game): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
