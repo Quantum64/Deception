@@ -8,5 +8,6 @@ interface Team {
     val name: String
     val genericName: String
     val other: Team
+    val color: Int
     fun assignmentCard(player: Player): Mono<(EmbedCreateSpec) -> Unit>
 }

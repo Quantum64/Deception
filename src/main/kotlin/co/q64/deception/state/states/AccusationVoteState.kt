@@ -12,24 +12,29 @@ import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.toFlux
 import reactor.kotlin.core.publisher.toMono
 
-class AccusationVoteState(game: Game) : BasicState(game, 60) {
+class AccusationVoteState(game: Game) : BasicState(game, 60, game.players.size) {
     override val state = GameState.ACCUSATION_INTRO
 
     override fun enter(): Mono<Void> = game.deafen().and(game.players.toFlux()
             .flatMap { player ->
-                game.theme.accusationVote(
-                        game.players
-                                .filter { it != player }
-                                .map { it.member }
-                                .mapIndexed { index, member -> "${numbers[index]} - ${member.mention}" }
-                                .joinToString("\n")
-                ).flatMap { embed ->
-                    player.channel?.createEmbed { embed(it) }
-                }.flatMap { message ->
-                    (game.players.filter { it != player }.indices).toFlux()
-                            .flatMap { message.addReaction(ReactionEmoji.unicode(numbers[it])) }
-                            .then(add(message))
-                }
+                if (game.theme.canVote(player))
+                    game.theme.accusationVote(
+                            game.players
+                                    .filter { it != player }
+                                    .map { it.member }
+                                    .mapIndexed { index, member -> "${numbers[index]} - ${member.mention}" }
+                                    .joinToString("\n")
+                    ).flatMap { embed ->
+                        player.channel?.createEmbed(embed).orEmpty()
+                    }.flatMap { message ->
+                        (game.players.filter { it != player }.indices).toFlux()
+                                .flatMap { message.addReaction(ReactionEmoji.unicode(numbers[it])) }
+                                .then(add(message))
+                    }
+                else
+                    game.theme.accusationNotEligible(player)
+                            .flatMap { embed -> player.channel?.createEmbed(embed).orEmpty() }
+                            .flatMap { addReaction(it) }
             })
             .then()
 
@@ -39,32 +44,35 @@ class AccusationVoteState(game: Game) : BasicState(game, 60) {
                     member.toMono().flatMap {
                         game.players.firstOrNull { it.member == member }?.toMono().orEmpty()
                     }.flatMap { player ->
-                        player.toMono().flatMap {
-                            reaction.toMono()
-                                    .filter { it.asUnicodeEmoji().isPresent }
-                                    .map { it.asUnicodeEmoji().get() }
-                                    .map { numbers.indexOf(it.raw) }
-                                    .filter { index -> index >= 0 && index < player.game.players.filter { it != player }.size }
-                                    .map { index -> player.game.players.filter { it != player }[index] }
-                                    .flatMap { target ->
-                                        target.votes++
-                                        player.voteCast = true
-                                        message.removeAllReactions().then(message.toMono()
-                                                .flatMap { message.channel }
-                                                .flatMap { channel ->
-                                                    game.theme.accusationComplete(target.member).flatMap { embed ->
-                                                        channel.createEmbed { embed(it) }
-                                                    }
-                                                }.flatMap { addReaction(it) })
-                                    }
-                                    .then()
-                        }
+                        player.toMono()
+                                .filter { !it.voteCast }
+                                .filter { game.theme.canVote(it) }
+                                .flatMap {
+                                    reaction.toMono()
+                                            .filter { it.asUnicodeEmoji().isPresent }
+                                            .map { it.asUnicodeEmoji().get() }
+                                            .map { numbers.indexOf(it.raw) }
+                                            .filter { index -> index >= 0 && index < player.game.players.filter { it != player }.size }
+                                            .map { index -> player.game.players.filter { it != player }[index] }
+                                            .flatMap { target ->
+                                                target.votes.add(player)
+                                                player.voteCast = true
+                                                message.removeAllReactions().then(message.toMono()
+                                                        .flatMap { message.channel }
+                                                        .flatMap { channel ->
+                                                            game.theme.accusationComplete(target.member).flatMap { embed ->
+                                                                channel.createEmbed { embed(it) }
+                                                            }
+                                                        }.flatMap { addReaction(it) })
+                                            }
+                                            .then()
+                                }
                     }.then())
 
     override fun exit(): Mono<Void> = super.exit().and(game.undeafen())
     override fun timeout(): Mono<Void> =
             game.players.toFlux().filter { !it.voteCast }.doOnNext { player ->
-                game.players.shuffled().first { it != player }.votes++
+                game.players.shuffled().first { it != player }.votes.add(player)
                 player.voteCast = true
             }.then(game.enter(GameState.ACCUSATION_RESULTS))
 }

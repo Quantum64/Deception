@@ -219,6 +219,7 @@ object DefectorOperation : Operation {
     override val automatic get() = false
     override fun description(player: Player) = "${player.member.mention} may defect and join the other agency. A VIRUS defector loses if any other VIRUS agent votes for them. A Service defector can't vote."
     override fun canAssign(player: Player) = player.role != ServiceLoyalistRole && player.role != VirusLoyalistRole
+    fun defected(player: Player) = player.team != player.startingTeam
 
     override fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
         embed.setDescription("You are currently working for **${player.team.name}**. " +

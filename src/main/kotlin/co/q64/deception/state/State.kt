@@ -8,6 +8,8 @@ import discord4j.core.`object`.reaction.ReactionEmoji
 import org.atteo.evo.inflector.English
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.toFlux
+import reactor.kotlin.core.publisher.toMono
 
 interface State {
     val state: GameState
@@ -17,31 +19,36 @@ interface State {
     fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> = Mono.empty()
 }
 
-abstract class BasicState(val game: Game, var timer: Int = -1) : State {
+abstract class BasicState(val game: Game, var timer: Int = -1, var required: Int = 0) : State {
     var messages: MutableList<Message> = mutableListOf()
     var ready: MutableSet<Member> = mutableSetOf()
-    var required = 0;
 
     abstract fun timeout(): Mono<Void>
     override fun enter(): Mono<Void> = Mono.just(true).then()
-    override fun exit(): Mono<Void> = Flux.fromIterable(messages).flatMap { it.delete() }.then()
+    override fun exit(): Mono<Void> = messages.toFlux().flatMap {
+        it
+                .delete()
+                .orEmpty()
+                .retry(1)
+                .onErrorResume { Mono.empty() }
+    }.then()
 
-    override fun tick(): Mono<Void> {
-        timer--
-        if (ready.size >= neededToContinue) {
-            timer = 0
-        }
-        if (timer > 0) {
-            if (timer % 2 == 0) {
-                return Flux.fromIterable(messages.filterNotNull()).flatMap { updateMessage(it) }.then()
+    override fun tick(): Mono<Void> = timer
+            .toMono()
+            .map { it - 1 }
+            .map { if (ready.size >= neededToContinue) 0 else it }
+            .doOnNext { timer = it }
+            .flatMap { timer ->
+                when {
+                    timer > 0 -> when {
+                        timer % 2 == 0 -> messages.toFlux().flatMap { updateMessage(it) }.then()
+                        else -> Mono.empty()
+                    }
+                    timer == 0 -> timeout()
+                    else -> Mono.empty()
+                }
             }
-            return Mono.empty()
-        }
-        if (timer == 0) {
-            return timeout()
-        }
-        return Mono.empty()
-    }
+            .then()
 
     override fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> {
         if (reaction.asUnicodeEmoji().isPresent && reaction.asUnicodeEmoji().get().raw == "✅" && member in game.players.map { it.member }) {
@@ -50,15 +57,17 @@ abstract class BasicState(val game: Game, var timer: Int = -1) : State {
         return Mono.empty()
     }
 
-    fun add(message: Message): Mono<Void> =
-            updateMessage(message).doOnEach {
-                messages.add(message)
-            }.then()
+    fun add(message: Message?): Mono<Void> =
+            message?.let { msg ->
+                updateMessage(msg).doOnEach {
+                    messages.add(msg)
+                }.then()
+            }.orEmpty()
 
-    fun addReaction(message: Message): Mono<Void> =
-            message.addReaction(ReactionEmoji.unicode("✅")).doFirst {
-                required++
-            }.and(add(message))
+    fun addReaction(message: Message?): Mono<Void> =
+            message?.addReaction(ReactionEmoji.unicode("✅"))?.doFirst {
+                if (required >= 0 && required < game.players.size) required++
+            }?.and(add(message)).orEmpty()
 
     private fun updateMessage(message: Message): Mono<Void> =
             message.embeds.getOrNull(0)?.let { embed ->
@@ -75,13 +84,6 @@ abstract class BasicState(val game: Game, var timer: Int = -1) : State {
             }.orEmpty()
 
     private val neededToContinue get() = if (required > 0) required else game.players.size
-}
-
-class NoOpState(private val mock: GameState) : State {
-    override val state get() = mock
-    override fun enter() = Mono.just(true).then()
-    override fun exit() = Mono.just(true).then()
-    override fun tick() = Mono.just(true).then()
 }
 
 object WaitingState : State {

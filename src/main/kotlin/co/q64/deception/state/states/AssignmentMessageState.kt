@@ -14,7 +14,7 @@ class AssignmentMessageState(game: Game) : BasicState(game, 30) {
                     .filter { it != game.selected }
                     .flatMap { player ->
                         game.theme.roleAssignmentWait(game.selected?.member ?: player.member).flatMap { embed ->
-                            player.channel?.createEmbed { embed(it) }
+                            player.channel?.createEmbed(embed)
                         }
                     }
                     .flatMap { add(it) }
@@ -23,7 +23,10 @@ class AssignmentMessageState(game: Game) : BasicState(game, 30) {
             Mono.justOrEmpty(game.selected)
                     .flatMap { player ->
                         player!!.team.assignmentCard(player).flatMap { embed ->
-                            player.channel?.createEmbed { embed(it) }
+                            player.channel?.createEmbed {
+                                embed(it)
+                                it.setColor(player.team.color)
+                            }
                         }
                     }.flatMap { addReaction(it) }
     )

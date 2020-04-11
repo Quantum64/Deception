@@ -27,12 +27,14 @@ interface Theme {
     fun operationDiscuss(member: Member): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationIntro(game: Game): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationVote(reactions: String): Mono<(EmbedCreateSpec) -> Unit>
+    fun accusationNotEligible(player: Player): Mono<(EmbedCreateSpec) -> Unit>
     fun accusationComplete(member: Member): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsVotes(player: Player, count: Int, emoji: String): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsNoSelection(): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsSelected(target: Player): Mono<(EmbedCreateSpec) -> Unit>
     fun resultsListEntry(target: Player): String
 
+    fun canVote(player: Player): Boolean
     fun calculateVotes(player: Player): Int
     fun winner(player: Player, selected: Player?): Boolean
 }

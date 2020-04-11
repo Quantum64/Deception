@@ -11,6 +11,7 @@ object RougeAgentRole : Role {
     override fun assign(game: Game) {
         game.players.firstOrNull { it.role == NoRole }?.let {
             it.role = this
+            it.startingTeam = VirusTeam
             it.team = VirusTeam
         }
 

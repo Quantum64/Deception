@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono
 import java.util.concurrent.ThreadLocalRandom
 
 object AgentTheme : Theme {
-    override val minPlayers = 5
+    override val minPlayers = 3
     override val maxPlayers = 9
 
     override val player get() = ServiceTeam
@@ -76,6 +76,16 @@ object AgentTheme : Theme {
                 "If they are a VIRUS double agent, The Service wins, otherwise the VIRUS agents win.\n\n$reactions")
     }
 
+    override fun accusationNotEligible(player: Player): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
+        embed.setTitle("Can't Vote").setDescription(player.operation.let { operation ->
+            when {
+                operation is DefectorOperation && operation.defected(player) && player.startingTeam == ServiceTeam ->
+                    "You defected from The Service, so you are not eligible to cast a vote."
+                else -> "Unknown Reason"
+            }
+        })
+    }
+
     override fun accusationComplete(member: Member): Mono<(EmbedCreateSpec) -> Unit> = Mono.just { embed ->
         embed.setTitle("Complete").setDescription("Voted for ${member.mention}")
     }
@@ -103,6 +113,13 @@ object AgentTheme : Theme {
             } +
             target.operation.let { operation ->
                 when (operation) {
+                    is DefectorOperation -> when {
+                        operation.defected(target) && target.startingTeam == ServiceTeam -> "Defected from The Service and couldn't vote"
+                        operation.defected(target) && target.startingTeam == VirusTeam && target.votes.any { it.team == VirusTeam } ->
+                            "Defected from VIRUS and lost due to a vote frm a VIRUS agent"
+                        operation.defected(target) && target.startingTeam == VirusTeam -> "Defected from VIRUS"
+                        else -> ""
+                    }
                     is ScapegoatOperation -> "Wanted to be imprisoned"
                     is GrudgeOperation -> "Wanted ${operation.target.member.mention} to be imprisoned"
                     is InfatuationOperation -> "Wanted ${operation.target.member.mention} to win"
@@ -111,11 +128,18 @@ object AgentTheme : Theme {
             }
 
 
-    override fun calculateVotes(player: Player) = player.votes + player.operation.let { operation ->
+    override fun canVote(player: Player) = player.operation.let { operation ->
+        when {
+            operation is DefectorOperation && operation.defected(player) && player.startingTeam == ServiceTeam -> false
+            else -> true
+        }
+    }
+
+    override fun calculateVotes(player: Player) = player.votes.size + player.operation.let { operation ->
         when (operation) {
             is IncriminatingEvidenceOperation -> when {
                 operation.action == IncriminatingEvidenceOperation.Action.ADD -> 1
-                operation.action == IncriminatingEvidenceOperation.Action.SHIELD && player.votes > 0 -> -1
+                operation.action == IncriminatingEvidenceOperation.Action.SHIELD && player.votes.size > 0 -> -1
                 else -> 0
             }
             else -> 0
@@ -127,6 +151,8 @@ object AgentTheme : Theme {
             when {
                 operation is ScapegoatOperation -> player == selected
                 selected?.operation is ScapegoatOperation -> false
+                operation is DefectorOperation && player.startingTeam == VirusTeam && operation.defected(player) ->
+                    player.votes.none { it.team == VirusTeam } && player.team == team.other
                 operation is InfatuationOperation -> winner(operation.target, selected)
                 operation is GrudgeOperation -> operation.target == selected
                 player.team == team.other -> true
@@ -145,17 +171,17 @@ object AgentTheme : Theme {
     )
 
     override fun generateOperations(game: Game): List<Operation> = listOf(
-            SpyTransferOperation,
-            ConfessionOperation,
-            AnonymousTipOperation,
-            DanishIntelligenceOperation,
-            OldPhotographsOperation,
-            DeepUndercoverOperation,
-            UnfortunateEncounterOperation,
+            //SpyTransferOperation,
+            //ConfessionOperation,
+            //AnonymousTipOperation,
+            //DanishIntelligenceOperation,
+            //OldPhotographsOperation,
+            //DeepUndercoverOperation,
+            //UnfortunateEncounterOperation,
             DefectorOperation,
-            ScapegoatOperation,
-            GrudgeOperation(game.players.random()),
-            InfatuationOperation(game.players.random()),
+            //ScapegoatOperation,
+            //GrudgeOperation(game.players.random()),
+            //InfatuationOperation(game.players.random()),
             SleeperAgentOperation,
             SecretTipOperation
     )
