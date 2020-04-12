@@ -121,8 +121,8 @@ object AgentTheme : Theme {
                         else -> ""
                     }
                     is ScapegoatOperation -> "Wanted to be imprisoned"
-                    is GrudgeOperation -> "Wanted ${operation.target.member.mention} to be imprisoned"
-                    is InfatuationOperation -> "Wanted ${operation.target.member.mention} to win"
+                    is GrudgeOperation -> "Wanted ${operation.target?.member?.mention} to be imprisoned"
+                    is InfatuationOperation -> "Wanted ${operation.target?.member?.mention} to win"
                     else -> ""
                 }
             }
@@ -153,7 +153,7 @@ object AgentTheme : Theme {
                 selected?.operation is ScapegoatOperation -> false
                 operation is DefectorOperation && player.startingTeam == VirusTeam && operation.defected(player) ->
                     player.votes.none { it.team == VirusTeam } && player.team == team.other
-                operation is InfatuationOperation -> winner(operation.target, selected)
+                operation is InfatuationOperation && operation.target != null -> winner(operation.target, selected)
                 operation is GrudgeOperation -> operation.target == selected
                 player.team == team.other -> true
                 else -> false
@@ -171,17 +171,17 @@ object AgentTheme : Theme {
     )
 
     override fun generateOperations(game: Game): List<Operation> = listOf(
-            //SpyTransferOperation,
-            //ConfessionOperation,
-            //AnonymousTipOperation,
-            //DanishIntelligenceOperation,
-            //OldPhotographsOperation,
-            //DeepUndercoverOperation,
-            //UnfortunateEncounterOperation,
+            SpyTransferOperation,
+            ConfessionOperation,
+            AnonymousTipOperation,
+            DanishIntelligenceOperation,
+            OldPhotographsOperation,
+            DeepUndercoverOperation,
+            UnfortunateEncounterOperation,
             DefectorOperation,
-            //ScapegoatOperation,
-            //GrudgeOperation(game.players.random()),
-            //InfatuationOperation(game.players.random()),
+            ScapegoatOperation,
+            GrudgeOperation(if (game.players.isEmpty()) null else game.players.random()),
+            InfatuationOperation(if (game.players.isEmpty()) null else game.players.random()),
             SleeperAgentOperation,
             SecretTipOperation
     )

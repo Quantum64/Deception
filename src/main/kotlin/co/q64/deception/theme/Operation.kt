@@ -11,7 +11,9 @@ interface Operation {
     val title: String
     val image: String? get() = null
     val automatic: Boolean get() = true
+    val helpTitle get() = title
     fun description(player: Player): String
+    fun helpDescription(player: Player): String = description(player)
     fun message(player: Player): Mono<(EmbedCreateSpec) -> Unit>
     fun canAssign(player: Player): Boolean = true
     fun handleMessage(player: Player, message: Message): Mono<Void> = Mono.empty()

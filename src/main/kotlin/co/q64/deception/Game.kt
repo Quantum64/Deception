@@ -159,6 +159,44 @@ class Game(private val guild: Guild) {
             .switchIfEmpty(message.reply("You can not leave a game that has already started!"))
             .then()
 
+    fun roles(message: Message): Mono<Void> = theme
+            .generateRoles()
+            .toFlux()
+            .map { "__${it.name}__: ${it.description}" }
+            .collectList()
+            .flatMap { message.reply("These are the currently enabled roles:\n${it.joinToString("\n")}") }
+            .then()
+
+    fun operations(message: Message): Mono<Void> = theme
+            .generateOperations(this)
+            .toFlux()
+            .flatMap { operations ->
+                message.authorAsMember.map { sender ->
+                    "**${operations.helpTitle}**: ${operations.helpDescription(SyntheticPlayer(this, sender))}"
+                }
+            }
+            .collectList()
+            .flatMap { message.reply("These are the currently enabled operations:\n${it.joinToString("\n")}") }
+            .then()
+
+    /*
+    fun kick(message: Message): Mono<Void> = Mono.just(state)
+            .filter { it is WaitingState }
+            .flatMap {
+                message.authorAsMember.flatMap { member ->
+                    inGame(member)
+                            .filter { it }
+                            .flatMap {
+                                players.removeIf { it.member == member }
+                                message.reply("Left game! (${players.size}/${theme.maxPlayers} players)")
+                            }
+                            .switchIfEmpty(message.reply("You cannot leave a game that you have not joined!"))
+                }
+            }
+            .switchIfEmpty(message.reply("You can not kick a player from a have that has already started!"))
+            .then()
+     */
+
     fun tick() = state.tick()
     fun handleReaction(member: Member, message: Message, reaction: ReactionEmoji): Mono<Void> =
             state.handleReaction(member, message, reaction)
@@ -175,7 +213,7 @@ class Game(private val guild: Guild) {
 
     fun deafen(): Mono<Void> = Flux.fromIterable(players.map { it.member })
             .flatMap { member ->
-                member.voiceState.filter { it.channelId.isPresent }.flatMap { voice ->
+                member.voiceState.filter { it.channelId.isPresent }.flatMap { _ ->
                     member.edit {
                         it.setDeafen(true)
                     }
@@ -185,7 +223,7 @@ class Game(private val guild: Guild) {
 
     fun undeafen(): Mono<Void> = Flux.fromIterable(players.map { it.member })
             .flatMap { member ->
-                member.voiceState.filter { it.channelId.isPresent }.flatMap { voice ->
+                member.voiceState.filter { it.channelId.isPresent }.flatMap { _ ->
                     member.edit {
                         it.setDeafen(false)
                     }

@@ -18,15 +18,19 @@ private val commands = mapOf<String, (Game, Message) -> Mono<Void>>(
         "join" to { g, m -> g.join(m) },
         "leave" to { g, m -> g.leave(m) },
         "start" to { g, m -> g.start(m) },
-        "end" to { g, m -> g.end(m) }
+        "end" to { g, m -> g.end(m) },
+        "roles" to { g, m -> g.roles(m) },
+        "operations" to { g, m -> g.operations(m) }
 )
 
 private val help = """
     These are the commands that I know
     **+join**: Join a waiting game
-    **+join**: Leave a waiting game
+    **+leave**: Leave a waiting game
     **+start**: Start the game
     **+end**: End the game
+    **+roles**: List the currently enabled roles
+    **+operations**: List the currently enabled operations
 """.trimIndent()
 
 class Bot(token: String) {
