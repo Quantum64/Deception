@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono
 import java.util.concurrent.ThreadLocalRandom
 
 object AgentTheme : Theme {
-    override val minPlayers = 3
+    override val minPlayers = 5
     override val maxPlayers = 9
 
     override val player get() = ServiceTeam
