@@ -18,5 +18,5 @@ open class Player(val game: Game, val member: Member) {
 }
 
 class SyntheticPlayer(game: Game, member: Member) : Player(game, member) {
-    override val mention: String get() = "The Current Player"
+    override val mention: String get() = "The current player"
 }
