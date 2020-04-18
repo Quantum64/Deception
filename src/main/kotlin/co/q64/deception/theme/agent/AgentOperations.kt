@@ -280,7 +280,7 @@ class GrudgeOperation(val target: Player?) : AgendaOperation {
         """.trimIndent())//.setThumbnail(email)
     }
 
-    override fun canAssign(player: Player) = player != target
+    override fun canAssign(player: Player) = super.canAssign(player) && player != target
 }
 
 class InfatuationOperation(val target: Player?) : AgendaOperation {
@@ -297,7 +297,7 @@ class InfatuationOperation(val target: Player?) : AgendaOperation {
         """.trimIndent())//.setThumbnail(email)
     }
 
-    override fun canAssign(player: Player) = player != target
+    override fun canAssign(player: Player) = super.canAssign(player) && player != target
 }
 
 object SleeperAgentOperation : AgendaOperation {

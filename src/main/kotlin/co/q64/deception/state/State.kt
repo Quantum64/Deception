@@ -25,7 +25,9 @@ abstract class BasicState(val game: Game, var timer: Int = -1, var required: Int
 
     abstract fun timeout(): Mono<Void>
     override fun enter(): Mono<Void> = Mono.just(true).then()
-    override fun exit(): Mono<Void> = messages.toFlux().flatMap {
+    override fun exit(): Mono<Void> = messages
+            .filterNotNull()
+            .toFlux().flatMap {
         it
                 .delete()
                 .orEmpty()
@@ -36,12 +38,12 @@ abstract class BasicState(val game: Game, var timer: Int = -1, var required: Int
     override fun tick(): Mono<Void> = timer
             .toMono()
             .map { it - 1 }
-            .map { if (ready.size >= neededToContinue) 0 else it }
+            .map { if (ready.size >= neededToContinue && timer > 0) 0 else it }
             .doOnNext { timer = it }
-            .flatMap { timer ->
+            .flatMap { _ ->
                 when {
                     timer > 0 -> when {
-                        timer % 2 == 0 -> messages.toFlux().flatMap { updateMessage(it) }.then()
+                        timer % 2 == 0 -> messages.filterNotNull().toFlux().flatMap { updateMessage(it) }.then()
                         else -> Mono.empty()
                     }
                     timer == 0 -> timeout()
